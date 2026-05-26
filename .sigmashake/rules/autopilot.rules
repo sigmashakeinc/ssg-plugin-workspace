@@ -1,0 +1,32 @@
+rule autopilot-allow-945cb344 {
+  enabled true
+  priority 80
+  severity info
+  ALLOW execution
+  IF command CONTAINS "echo test"
+  MESSAGE "Autopilot: auto-allowed execution."
+}
+rule autopilot-allow-159df783 {
+  enabled true
+  priority 80
+  severity info
+  ALLOW execution
+  IF command CONTAINS "echo 1"
+  MESSAGE "Autopilot: auto-allowed execution."
+}
+rule autopilot-deny-7267d375 {
+  enabled true
+  priority 80
+  severity info
+  DENY execution
+  IF command CONTAINS "rm -rf /"
+  MESSAGE "Autopilot: auto-denied execution."
+}
+rule autopilot-allow-2c32699b {
+  enabled true
+  priority 80
+  severity info
+  ALLOW execution
+  IF command CONTAINS "echo e2e-test"
+  MESSAGE "Autopilot: auto-allowed execution."
+}

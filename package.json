@@ -1,0 +1,63 @@
+{
+  "name": "sigmashake-workspace",
+  "version": "0.1.1",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "sigmashake-workspace": "tools/workspace-cli.ts"
+  },
+  "scripts": {
+    "generate": "bun run src/build-registry.ts && bun run src/build-infrastructure.ts && bun run src/build-readiness.ts",
+    "prebuild": "bun run generate",
+    "predeploy": "bun run generate",
+    "dev": "wrangler dev",
+    "build:client": "bun run generate && vite build && bun run scripts/strip-index-html.ts",
+    "build:electrobun": "bun run generate && vite build --config vite.electrobun.config.ts",
+    "build:vscode": "bun run generate && vite build --config vite.vscode.config.ts",
+    "build:plugin": "bun run generate && bun run scripts/build-plugin.ts",
+    "package:vscode": "bun run build:vscode && cd vscode && pnpm install --silent --prefer-offline && pnpm dlx @vscode/vsce package --no-dependencies --out .",
+    "publish:vscode": "bash ../shared/agent-config/scripts/deploy-guarded.sh --check && bun run build:vscode && cd vscode && pnpm install --silent --prefer-offline && pnpm dlx @vscode/vsce publish --no-dependencies",
+    "deploy": "bash ../shared/agent-config/scripts/deploy-guarded.sh --check && bun run generate && vite build && bun run scripts/strip-index-html.ts && bun x wrangler deploy",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json",
+    "pretest": "bun run generate",
+    "test": "bun run scripts/run-vitest.ts",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:chaos": "bun test test/chaos",
+    "test:regression": "vitest run --project regression",
+    "test:configuration": "vitest run --project configuration",
+    "test:load": "vitest run --project perf test/load",
+    "test:stress": "vitest run --project perf test/stress",
+    "test:spike": "vitest run --project perf test/spike",
+    "test:soak": "vitest run --project perf test/soak",
+    "test:scalability": "vitest run --project perf test/scalability",
+    "test:api": "vitest run --project integration",
+    "test:dependencies": "bun audit --audit-level=high",
+    "build": "bun run build:client && bun run build:electrobun && bun run build:vscode && bun run build:plugin",
+    "clean": "bun run scripts/clean.ts",
+    "lint": "biome check .",
+    "fix": "biome check --write .",
+    "test:sast": "bun test test/sast",
+    "test:audit": "bun test test/dependencies"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "6.0.1",
+    "hono": "4.12.18",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "vite": "8.0.13"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.14.0",
+    "@cloudflare/workers-types": "4.20260317.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "miniflare": "^4.20260317.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.0",
+    "wrangler": "^4.81.0"
+  },
+  "overrides": {
+    "vite": "^8.0.13"
+  }
+}

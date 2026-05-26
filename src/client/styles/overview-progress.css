@@ -1,0 +1,113 @@
+/* Per-source load-progress rows in the Overview sticky header.
+   Shown while load() is in flight; collapses to zero height when idle. */
+
+.ovp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition:
+    max-height 0.18s ease,
+    opacity 0.18s ease,
+    margin-bottom 0.18s ease;
+  margin-bottom: 0;
+}
+
+.ovp--active {
+  max-height: 200px;
+  opacity: 1;
+  margin-bottom: 6px;
+}
+
+.ovp__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  line-height: 1;
+  padding: 3px 0;
+}
+
+/* Status dot */
+.ovp__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ovp__dot--queued {
+  background: var(--ss-fg-4);
+}
+.ovp__dot--loading {
+  background: var(--ss-sky);
+  animation: ovp-pulse 1s ease-in-out infinite;
+}
+.ovp__dot--done {
+  background: var(--ss-ok);
+}
+.ovp__dot--error {
+  background: var(--ss-fail);
+}
+.ovp__dot--timeout {
+  background: var(--ss-warn);
+}
+
+@keyframes ovp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Name */
+.ovp__name {
+  color: var(--ss-fg-2);
+  font-weight: 500;
+  min-width: 160px;
+}
+
+/* State label */
+.ovp__state {
+  color: var(--ss-fg-4);
+  min-width: 54px;
+}
+.ovp__state--loading {
+  color: var(--ss-sky);
+}
+.ovp__state--done {
+  color: var(--ss-ok);
+}
+.ovp__state--error {
+  color: var(--ss-fail);
+}
+.ovp__state--timeout {
+  color: var(--ss-warn);
+}
+
+/* Elapsed */
+.ovp__elapsed {
+  color: var(--ss-fg-4);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+}
+
+/* Short message (error / timeout detail) */
+.ovp__msg {
+  color: var(--ss-fg-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Health-scan progress fraction inside the name */
+.ovp__fraction {
+  color: var(--ss-fg-4);
+  font-variant-numeric: tabular-nums;
+}

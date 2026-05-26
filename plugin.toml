@@ -1,0 +1,31 @@
+# plugin.toml — SigmaShake plugin manifest for the Workspace plugin.
+#
+# `ssg plugins build` converts this to dist/plugin.json (the canonical, signed
+# manifest the hub stores and the SSG daemon consumes). See:
+# https://docs.sigmashake.com/plugins/manifest-reference
+#
+# Workspace ships exclusively as an SSG plugin (the legacy /workspace SPA route
+# was retired). Install it from the marketplace:
+#   ssg plugins install workspace
+
+id              = "workspace"
+version         = "0.1.1"
+name            = "Workspace"
+description     = "Monorepo manager for SigmaShake — projects, health, run scripts, edit, distribution, platform parity matrix."
+category        = "tools"
+entry           = "index.html"
+min_ssg_version = "0.29.94"
+
+# Sidebar entry — the dashboard surfaces this under Tools once the plugin is
+# installed. path MUST stay scoped to /plugins/<id>/.
+[[nav]]
+label   = "Workspace"
+path    = "/plugins/workspace/"
+section = "tools"
+order   = 20
+
+# `build:plugin` writes to dist-plugin/ (single-file Vite bundle); `ssg plugins
+# build` wipes + creates dist/ before invoking this command and tars whatever
+# lands in dist/. Copy the plugin bundle into dist/ as the final step.
+[build]
+command = "bun run build:plugin && cp -r dist-plugin/. dist/"

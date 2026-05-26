@@ -1,0 +1,339 @@
+/* Observability view — consolidated service-health board (ObservabilityView).
+   Reuses the workspace glass theme (--ss-* vars) and the tone palette shared
+   with .inbox-pill: green / amber / red. */
+
+.observ__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+/* ── Banner ── */
+.observ__banner {
+  border: 1px solid var(--ss-glass-line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin-bottom: 14px;
+  background: var(--ss-glass-1);
+  color: var(--ss-fg-2);
+}
+.observ__banner strong {
+  color: var(--ss-fg-1, #ededed);
+}
+.observ__banner--ok {
+  border-color: rgba(80, 200, 120, 0.5);
+}
+.observ__banner--warn {
+  border-color: rgba(255, 196, 0, 0.5);
+}
+.observ__banner--info {
+  border-color: rgba(120, 168, 255, 0.5);
+}
+
+/* ── Summary stat cards ── */
+.observ__summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.observ-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--ss-glass-line);
+  border-radius: 10px;
+  background: var(--ss-glass-1);
+}
+.observ-stat__value {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ss-fg-1, #ededed);
+  font-variant-numeric: tabular-nums;
+}
+.observ-stat__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-fg-2);
+}
+.observ-stat__hint {
+  font-size: 11px;
+  color: var(--ss-fg-3);
+}
+.observ-stat--ok .observ-stat__value {
+  color: #7fd49a;
+}
+.observ-stat--warn .observ-stat__value {
+  color: #f0c14b;
+}
+.observ-stat--err .observ-stat__value {
+  color: #f08c87;
+}
+.observ-stat--ok {
+  border-color: rgba(80, 200, 120, 0.4);
+}
+.observ-stat--warn {
+  border-color: rgba(255, 196, 0, 0.4);
+}
+.observ-stat--err {
+  border-color: rgba(232, 84, 76, 0.45);
+}
+
+/* ── Service grid ── */
+.observ__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.observ-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 13px;
+  border: 1px solid var(--ss-glass-line);
+  border-left-width: 3px;
+  border-radius: 9px;
+  background: var(--ss-glass-1);
+}
+.observ-card--ok {
+  border-left-color: #7fd49a;
+}
+.observ-card--warn {
+  border-left-color: #f0c14b;
+}
+.observ-card--err {
+  border-left-color: #f08c87;
+}
+.observ-card--muted {
+  border-left-color: var(--ss-glass-line);
+}
+.observ-card__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.observ-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.observ-card__dot--ok {
+  background: #7fd49a;
+}
+.observ-card__dot--warn {
+  background: #f0c14b;
+}
+.observ-card__dot--err {
+  background: #f08c87;
+}
+.observ-card__dot--muted {
+  background: var(--ss-fg-3);
+}
+.observ-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ss-fg-1, #ededed);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.observ-card__blurb {
+  font-size: 11.5px;
+  color: var(--ss-fg-3);
+  line-height: 1.35;
+  margin: 0;
+}
+.observ-card__meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 2px 0 0;
+}
+.observ-card__meta > div {
+  display: flex;
+  flex-direction: column;
+}
+.observ-card__meta dt {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ss-fg-3);
+}
+.observ-card__meta dd {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ss-fg-2);
+  font-variant-numeric: tabular-nums;
+}
+.observ-card__error {
+  font-size: 11px;
+  color: #f08c87;
+  background: rgba(232, 84, 76, 0.1);
+  border-radius: 5px;
+  padding: 4px 7px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Sparkline ── */
+.observ-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 16px;
+}
+.observ-spark__bar {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 1px;
+  height: 100%;
+}
+.observ-spark__bar--ok {
+  background: rgba(80, 200, 120, 0.55);
+}
+.observ-spark__bar--bad {
+  background: #f08c87;
+}
+.observ-spark--empty {
+  align-items: center;
+  font-size: 11px;
+  color: var(--ss-fg-3);
+}
+
+/* ── Pills ── */
+.observ-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--ss-glass-line);
+  background: var(--ss-glass-1);
+  color: var(--ss-fg-2);
+  white-space: nowrap;
+  flex: none;
+}
+.observ-pill--ok {
+  border-color: rgba(80, 200, 120, 0.5);
+  color: #7fd49a;
+}
+.observ-pill--warn {
+  border-color: rgba(255, 196, 0, 0.5);
+  color: #f0c14b;
+}
+.observ-pill--err {
+  border-color: rgba(232, 84, 76, 0.55);
+  color: #f08c87;
+}
+.observ-pill--muted {
+  color: var(--ss-fg-3);
+}
+
+/* ── Incident log ── */
+.observ-incidents {
+  margin-bottom: 18px;
+}
+.observ-incidents__title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-fg-2);
+  margin: 0 0 8px;
+}
+.observ-incidents__empty {
+  font-size: 12px;
+  color: var(--ss-fg-3);
+  margin: 0;
+}
+.observ-incidents__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.observ-incident {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 9px;
+  border: 1px solid var(--ss-glass-line);
+  border-radius: 7px;
+  background: var(--ss-glass-1);
+  font-size: 12px;
+}
+.observ-incident__name {
+  font-weight: 600;
+  color: var(--ss-fg-1, #ededed);
+  flex: none;
+}
+.observ-incident__detail {
+  flex: 1;
+  color: var(--ss-fg-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.observ-incident__age {
+  color: var(--ss-fg-3);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+/* ── Unmonitored note ── */
+.observ-extra {
+  border: 1px solid var(--ss-glass-line);
+  border-radius: 8px;
+  background: var(--ss-glass-1);
+  padding: 4px 12px;
+  margin-bottom: 14px;
+}
+.observ-extra__summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-fg-2);
+  padding: 6px 0;
+}
+.observ-extra__body {
+  padding: 4px 0 8px;
+}
+.observ-extra__line {
+  font-size: 11.5px;
+  color: var(--ss-fg-3);
+  line-height: 1.5;
+  margin: 4px 0;
+}
+.observ-extra__line strong {
+  color: var(--ss-fg-2);
+}
+
+/* ── Footer ── */
+.observ__foot {
+  font-size: 11px;
+  color: var(--ss-fg-3);
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .observ__summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

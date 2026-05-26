@@ -1,0 +1,13 @@
+node_modules/
+.wrangler/
+dist-local/
+dist-plugin/
+public/assets/
+public/index.html
+src/registry.generated.ts
+src/infrastructure.generated.ts
+src/readiness.generated.ts
+vscode/out/
+vscode/webview-dist/
+vscode/node_modules/
+vscode/*.vsix

@@ -1,0 +1,52 @@
+# .security.toml — sigmashake-workspace
+# Schema: https://github.com/sigmashake/sigmashake-mono/blob/main/sigmashake-security/data/frameworks/SCHEMA.md
+
+[meta]
+slug = "sigmashake-workspace"
+surfaces = ["WEB_HTTP"]
+last_review = 2026-05-18
+reviewer = "audit-bot-stateless-web@sigmashake.com"
+notes = "Monorepo workspace UI at workspace.sigmashake.com. Full operator auth gate: session_id cookie validated against shared ACCOUNTS_SESSIONS KV; isOperator() allowlist check via ALLOWED_GITHUB_USER_IDS; run_worker_first=true prevents SPA bypass; redirects to accounts.sigmashake.com/auth/login if unauthenticated. Service bindings to SUPPORT and SALES for inbox. Audited 2026-05-18."
+
+[owasp_web_2021]
+A01 = "implemented"  # Broken Access Control — session cookie validated against ACCOUNTS_SESSIONS KV on every request (src/worker.ts:67-84); isOperator() allowlist check (src/worker.ts:56-65); run_worker_first=true prevents static SPA bypass (wrangler.toml); /healthz is only public path
+A02 = "partial"      # Cryptographic Failures — session token validated against KV (no local crypto); HTTPS via CF edge; SUPPORT_AGENT_TOKEN and SALES_AGENT_TOKEN in Secrets Store; no HSTS in examined source
+A03 = "implemented"  # Injection — no SQL; KV lookups use fixed session: prefix (src/worker.ts:36,71); inbox proxy passes structured JSON only; no eval/execSync; path-traversal guard on edit endpoint (per CLAUDE.md 3-file whitelist)
+A04 = "implemented"  # Insecure Design — run_worker_first=true ensures every request hits auth middleware before assets (src/worker.ts comment); PUBLIC_PATHS minimal set ({/healthz}) (src/worker.ts:107); login redirect preserves return-to URL safely
+A05 = "partial"      # Security Misconfiguration — onError handler (src/worker.ts:50-54) returns generic error; no CSP or security headers set in examined source; X-SigmaShake-Token required on non-GET local daemon calls (per CLAUDE.md)
+A06 = "partial"          # Vulnerable and Outdated Components — no dep-audit sentinel
+A07 = "implemented"  # Identification and Authentication Failures — GitHub OAuth session via ACCOUNTS_SESSIONS KV; isOperator() allowlist (ALLOWED_GITHUB_USER_IDS env var); 302 redirect to accounts login if no valid session
+A08 = "partial"      # Software and Data Integrity Failures — inbox proxy safelists request body before upstream (per CLAUDE.md); static registry baked at build time; no cryptographic signing of registry
+A09 = "partial"      # Security Logging and Monitoring — console.error on unhandled errors (src/worker.ts:52); no structured audit log for workspace operations; no SIEM shipping
+A10 = "partial"      # SSRF — outbound to SUPPORT and SALES service bindings (same-zone, not SSRF risk); local daemon calls at 127.0.0.1 (client-side, not server-side); cloud worker has no user-controlled URL fetch
+
+[mitre_attack]
+TA0001 = "implemented"  # Initial Access — every request hits auth middleware before assets (run_worker_first=true); session KV lookup on every request; operator allowlist check
+TA0002 = "implemented"  # Execution — no shell exec; workspace run/edit endpoints are local-daemon only (cloud returns 501); no eval/execSync
+TA0003 = "na"           # Persistence — stateless Worker; session state in ACCOUNTS_SESSIONS KV (owned by accounts worker)
+TA0004 = "implemented"  # Privilege Escalation — operator allowlist is flat; no elevation path; isOperator() check on every request
+TA0005 = "implemented"  # Defense Evasion — run_worker_first=true closes static SPA bypass; PUBLIC_PATHS minimal; generic error messages
+TA0006 = "implemented"  # Credential Access — SUPPORT_AGENT_TOKEN and SALES_AGENT_TOKEN in Secrets Store; session tokens in ACCOUNTS_SESSIONS KV; no secrets in source
+TA0007 = "partial"      # Discovery — /healthz public; API paths (/api/workspace/*) gated by auth; login redirect reveals accounts.sigmashake.com dependency
+TA0008 = "na"           # Lateral Movement — stateless Worker; SUPPORT and SALES service bindings are structured, not arbitrary network
+TA0009 = "partial"      # Collection — inbox view aggregates support tickets and sales leads; safelist body before upstream (per CLAUDE.md); operator-only access
+TA0010 = "partial"      # Exfiltration — SUPPORT/SALES service binding responses proxied verbatim (per CLAUDE.md); operator-only access; no user-controlled export
+TA0011 = "implemented"  # Command and Control — outbound only to SUPPORT + SALES service bindings; no user-controlled URL injection in cloud worker
+TA0040 = "partial"      # Impact — no rate limit on workspace API calls; operator allowlist limits attack surface; CF DDoS as primary guard
+TA0042 = "na"           # Resource Development — not applicable
+TA0043 = "partial"      # Reconnaissance — /healthz public; authenticated paths reveal monorepo project registry structure; login redirect reveals accounts.sigmashake.com
+
+[mitre_d3fend]
+D3_MODEL = "partial"     # Model — CLAUDE.md documents operator allowlist, run_worker_first requirement, inbox service binding auth, body safelist, and 3-file edit whitelist
+D3_HARDEN = "implemented" # Harden — run_worker_first=true (wrangler.toml); session KV auth on every request; isOperator() allowlist; X-SigmaShake-Token on daemon calls; body safelist on inbox proxy
+D3_DETECT = "partial"    # Detect — console.error on unhandled errors (src/worker.ts:52); no structured audit log; no SIEM shipping; 302 redirects on auth failure
+D3_ISOLATE = "implemented" # Isolate — CF Worker V8 isolate; cloud worker returns 501 for run/edit (local-only capabilities); service bindings are structured CF primitives
+D3_DECEIVE = "na"        # Deception — not in scope
+D3_EVICT = "implemented" # Evict — session revocation via ACCOUNTS_SESSIONS KV delete; SUPPORT_AGENT_TOKEN and SALES_AGENT_TOKEN rotation via Secrets Store; ALLOWED_GITHUB_USER_IDS removal from env var
+D3_RESTORE = "partial"   # Restore — stateless Worker; session state in KV; no persistent workspace data in this worker; no incident runbook
+
+[notes]
+A01 = "Session validation at src/worker.ts:67-84: ACCOUNTS_SESSIONS.get(session:+sessionId, json). isOperator() allowlist at src/worker.ts:56-65 using ALLOWED_GITHUB_USER_IDS env var (comma-separated)."
+A04 = "run_worker_first = true in wrangler.toml: src/worker.ts comment — 'without it the static SPA bundle would bypass the worker and leak to anyone who knows the URL'. PUBLIC_PATHS = Set(['/healthz']) at src/worker.ts:107."
+A07 = "302 redirect to https://accounts.sigmashake.com/auth/login at src/worker.ts:94-102 if no valid session. Return-to URL validated to *.sigmashake.com by accounts worker."
+TA0004 = "isOperator() at src/worker.ts:56-65: checks userId against ALLOWED_GITHUB_USER_IDS on every request after session lookup."

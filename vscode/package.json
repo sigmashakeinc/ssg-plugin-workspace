@@ -1,0 +1,67 @@
+{
+  "name": "workspace",
+  "displayName": "SigmaShake Workspace",
+  "description": "Visual monorepo browser, script runner, health inspector, and inline editor — embedded in VS Code. Connects to a local SigmaShake (ssg) daemon for Run/Inspect/Edit; degrades to Browse-only when the daemon is unreachable.",
+  "version": "0.1.0",
+  "publisher": "sigmashake",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "sigmashake",
+    "monorepo",
+    "workspace",
+    "ssg"
+  ],
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sigmashake/sigmashake-mono.git",
+    "directory": "sigmashake-workspace/vscode"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "sigmashake.workspace.open",
+        "title": "SigmaShake: Open Workspace",
+        "category": "SigmaShake"
+      }
+    ],
+    "configuration": {
+      "title": "SigmaShake Workspace",
+      "properties": {
+        "sigmashake.workspace.daemonUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:7901",
+          "description": "Base URL of the local SigmaShake (ssg) daemon. Run/Inspect/Edit endpoints are reached here; leave empty to force the cloud Browse-only degradation."
+        },
+        "sigmashake.workspace.daemonToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional X-SigmaShake-Token bearer for the daemon. Required when the daemon was started without --no-auth (the default). Find it at ~/.sigmashake/dashboard.token or via `ssg dashboard token`."
+        },
+        "sigmashake.workspace.monorepoRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the monorepo root the daemon should scan. Defaults to the daemon's own default when blank."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/vscode": "^1.84.0",
+    "typescript": "6.0.2"
+  }
+}

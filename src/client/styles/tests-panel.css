@@ -1,0 +1,747 @@
+/* Tests panel — run feedback styles.
+   Imported by TestsPanel.tsx. Do NOT add rules for classes owned by index.css. */
+
+/* Spinner keyframe */
+@keyframes tp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Inline run status shown next to the Run button */
+.tests__run-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ss-fg-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tests__run-status--running {
+  color: var(--ss-brand);
+}
+
+.tests__run-status--pass {
+  color: var(--ss-green);
+}
+
+.tests__run-status--fail {
+  color: var(--ss-red);
+}
+
+.tests__run-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: tp-spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+/* Last-run metadata badge shown in the actions column */
+.tests__kind-last-run {
+  font-size: 11px;
+  color: var(--ss-fg-3);
+  line-height: 1.4;
+  margin-top: 2px;
+  font-family: var(--ss-font-mono);
+  letter-spacing: -0.01em;
+}
+
+.tests__kind-last-run--pass {
+  color: var(--ss-ok);
+}
+.tests__kind-last-run--fail {
+  color: var(--ss-fail);
+}
+
+/* Collapsible stderr tail */
+.tests__stderr-tail {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.tests__stderr-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ss-fail);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--ss-font-mono);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0.85;
+}
+.tests__stderr-toggle:hover {
+  opacity: 1;
+}
+
+.tests__stderr-lines {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 0.5px solid rgba(239, 68, 68, 0.22);
+  border-radius: var(--ss-radius-sm);
+  overflow-x: auto;
+}
+
+.tests__stderr-line {
+  display: block;
+  font-family: var(--ss-font-mono);
+  font-size: 10.5px;
+  color: var(--ss-fg-2);
+  line-height: 1.55;
+  white-space: pre;
+}
+
+/* ── Drill-down: per-kind test report ───────────────────────────────────────
+   Added by the test-report feature. A kind card spans the full grid width
+   while expanded so the metrics + per-test list have room to breathe. */
+
+.tests__kind--expanded {
+  grid-column: 1 / -1;
+}
+
+/* Leading cluster of the kind row: chevron + label + metric chip. */
+.tests__kind-row-lead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.tests__kind-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ss-radius-sm);
+  background: none;
+  color: var(--ss-fg-3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tests__kind-toggle:hover {
+  background: var(--ss-glass-line);
+  color: var(--ss-fg-1);
+}
+
+.tests__chev {
+  font-size: 9px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.tests__chev--open {
+  transform: rotate(90deg);
+}
+
+/* Compact "142 tests · 1.3s" badge on a kind row. */
+.tests__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 1.5px 7px;
+  border-radius: var(--ss-radius-pill);
+  font-family: var(--ss-font-mono);
+  font-size: 10.5px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  border: 0.5px solid transparent;
+}
+.tests__chip--ok {
+  color: var(--ss-ok);
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.22);
+}
+.tests__chip--fail {
+  color: var(--ss-fail);
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.22);
+}
+.tests__chip-num {
+  font-weight: 700;
+}
+.tests__chip-fail {
+  color: var(--ss-fail);
+  font-weight: 600;
+}
+.tests__chip-dur {
+  color: var(--ss-fg-3);
+}
+
+/* Service-wide recorded-tests banner under the overview pills. */
+.tests__recorded {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: var(--ss-radius-md);
+  border: 0.5px solid var(--ss-glass-line);
+  background: var(--ss-bg-3);
+}
+.tests__recorded--ok {
+  border-left: 2px solid var(--ss-ok);
+}
+.tests__recorded--warn {
+  border-left: 2px solid var(--ss-fail);
+}
+.tests__recorded-num {
+  font-family: var(--ss-font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ss-fg-0);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.tests__recorded-text {
+  font-size: 11.5px;
+  color: var(--ss-fg-2);
+  line-height: 1.5;
+}
+.tests__recorded-pass {
+  color: var(--ss-ok);
+}
+.tests__recorded-fail {
+  color: var(--ss-fail);
+}
+
+/* The expanded drill-down body itself. */
+.tests__drill {
+  margin-top: 4px;
+  padding: 12px;
+  border-radius: var(--ss-radius-md);
+  border: 0.5px solid var(--ss-glass-line);
+  background: var(--ss-bg-1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tests__drill--empty {
+  gap: 0;
+}
+.tests__drill-empty-text {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ss-fg-3);
+  line-height: 1.55;
+}
+.tests__drill-empty-text code {
+  font-family: var(--ss-font-mono);
+  font-size: 10.5px;
+  padding: 1px 4px;
+  border-radius: var(--ss-radius-sm);
+  background: var(--ss-glass-line);
+  color: var(--ss-fg-1);
+}
+
+/* Stat tiles. */
+.tests__drill-statgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 7px;
+}
+.tests__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px;
+  border-radius: var(--ss-radius-sm);
+  background: var(--ss-bg-3);
+  border: 0.5px solid var(--ss-glass-line);
+}
+.tests__stat-value {
+  font-family: var(--ss-font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.tests__stat-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ss-fg-4);
+}
+.tests__stat--total .tests__stat-value {
+  color: var(--ss-fg-0);
+}
+.tests__stat--pass .tests__stat-value {
+  color: var(--ss-ok);
+}
+.tests__stat--fail .tests__stat-value {
+  color: var(--ss-fail);
+}
+.tests__stat--skip .tests__stat-value {
+  color: var(--ss-warn);
+}
+.tests__stat--muted .tests__stat-value {
+  color: var(--ss-fg-2);
+}
+
+/* Pass-rate proportion bar. */
+.tests__rate {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.tests__rate-bar {
+  display: flex;
+  flex: 1;
+  height: 7px;
+  border-radius: var(--ss-radius-pill);
+  overflow: hidden;
+  background: var(--ss-bg-4);
+}
+.tests__rate-seg {
+  height: 100%;
+}
+.tests__rate-seg--pass {
+  background: var(--ss-ok);
+}
+.tests__rate-seg--fail {
+  background: var(--ss-fail);
+}
+.tests__rate-seg--skip {
+  background: var(--ss-warn);
+}
+.tests__rate-label {
+  font-size: 10.5px;
+  font-family: var(--ss-font-mono);
+  color: var(--ss-fg-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Meta row: runner / script / exit code / when. */
+.tests__drill-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 11px;
+  color: var(--ss-fg-3);
+}
+.tests__drill-meta strong {
+  color: var(--ss-fg-1);
+  font-weight: 600;
+}
+.tests__drill-meta code {
+  font-family: var(--ss-font-mono);
+  font-size: 10px;
+  color: var(--ss-fg-1);
+}
+.tests__mono-ok {
+  color: var(--ss-ok);
+  font-family: var(--ss-font-mono);
+}
+.tests__mono-fail {
+  color: var(--ss-fail);
+  font-family: var(--ss-font-mono);
+}
+
+.tests__drill-broad,
+.tests__drill-note {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ss-fg-3);
+}
+.tests__drill-broad {
+  padding: 6px 9px;
+  border-radius: var(--ss-radius-sm);
+  background: rgba(245, 158, 11, 0.08);
+  border: 0.5px solid rgba(245, 158, 11, 0.22);
+}
+.tests__drill-broad code {
+  font-family: var(--ss-font-mono);
+}
+
+/* Per-test result list. */
+.tests__cases {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tests__cases-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tests__cases-title {
+  font-family: var(--ss-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-fg-1);
+}
+.tests__cases-filter {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--ss-radius-sm);
+  background: var(--ss-bg-3);
+  border: 0.5px solid var(--ss-glass-line);
+}
+.tests__filter-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 2.5px 8px;
+  border-radius: calc(var(--ss-radius-sm) - 1px);
+  font-size: 10.5px;
+  color: var(--ss-fg-3);
+}
+.tests__filter-btn:hover {
+  color: var(--ss-fg-1);
+}
+.tests__filter-btn--on {
+  background: var(--ss-bg-1);
+  color: var(--ss-fg-0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.tests__case-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+.tests__case-group {
+  border-radius: var(--ss-radius-sm);
+  border: 0.5px solid var(--ss-glass-line);
+  overflow: hidden;
+}
+.tests__case-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 9px;
+  background: var(--ss-bg-3);
+  border-bottom: 0.5px solid var(--ss-glass-line);
+}
+.tests__case-group-file {
+  font-family: var(--ss-font-mono);
+  font-size: 10.5px;
+  color: var(--ss-fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tests__case-group-tally {
+  display: inline-flex;
+  gap: 7px;
+  font-family: var(--ss-font-mono);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.tests__tally-pass {
+  color: var(--ss-ok);
+}
+.tests__tally-fail {
+  color: var(--ss-fail);
+}
+
+.tests__case-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* A per-test row is now a list item (`.tests__case-item`) wrapping the flex
+   row (`.tests__case`) plus an optional expandable failure-reason block. */
+.tests__case-item + .tests__case-item {
+  border-top: 0.5px solid color-mix(in srgb, var(--ss-glass-line) 55%, transparent);
+}
+.tests__case-item--failed {
+  background: rgba(239, 68, 68, 0.06);
+}
+.tests__case {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+.tests__case-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tests__case-dot--passed {
+  background: var(--ss-ok);
+}
+.tests__case-dot--failed {
+  background: var(--ss-fail);
+}
+.tests__case-dot--skipped {
+  background: var(--ss-warn);
+}
+.tests__case-dot--todo {
+  background: var(--ss-fg-4);
+}
+.tests__case-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ss-fg-1);
+}
+.tests__case-item--failed .tests__case-name {
+  color: var(--ss-fg-0);
+}
+
+/* "why?" toggle on a failed row + the failure-detail block it reveals. */
+.tests__case-why {
+  flex-shrink: 0;
+  border: 0.5px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--ss-fail);
+  cursor: pointer;
+  padding: 1px 7px;
+  border-radius: var(--ss-radius-pill);
+  font-size: 9.5px;
+  font-family: var(--ss-font-mono);
+  letter-spacing: 0.01em;
+}
+.tests__case-why:hover {
+  background: rgba(239, 68, 68, 0.16);
+}
+.tests__case-reason {
+  margin: 0 9px 7px 23px;
+  padding: 7px 9px;
+  background: var(--ss-bg-0);
+  border: 0.5px solid rgba(239, 68, 68, 0.22);
+  border-left: 2px solid var(--ss-fail);
+  border-radius: var(--ss-radius-sm);
+  font-family: var(--ss-font-mono);
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--ss-fg-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+.tests__case-sub {
+  font-family: var(--ss-font-mono);
+  font-size: 9.5px;
+  color: var(--ss-fg-3);
+  flex-shrink: 0;
+}
+.tests__case-status {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.tests__case-status--passed {
+  color: var(--ss-ok);
+}
+.tests__case-status--failed {
+  color: var(--ss-fail);
+  font-weight: 700;
+}
+.tests__case-status--skipped {
+  color: var(--ss-warn);
+}
+.tests__case-status--todo {
+  color: var(--ss-fg-4);
+}
+.tests__case-dur {
+  font-family: var(--ss-font-mono);
+  font-size: 9.5px;
+  color: var(--ss-fg-3);
+  flex-shrink: 0;
+  min-width: 44px;
+  text-align: right;
+}
+
+/* Raw output tail. */
+.tests__drill-output {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tests__drill-output-toggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--ss-font-mono);
+  font-size: 10.5px;
+  color: var(--ss-fg-3);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tests__drill-output-toggle:hover {
+  color: var(--ss-fg-1);
+}
+.tests__drill-output-body {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--ss-bg-0);
+  border: 0.5px solid var(--ss-glass-line);
+  border-radius: var(--ss-radius-sm);
+}
+.tests__drill-output-line {
+  display: block;
+  font-family: var(--ss-font-mono);
+  font-size: 10px;
+  color: var(--ss-fg-2);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Run-history trend grid (GitHub-contribution style) ─────────────────────
+   One coloured square per recorded run. The compact `.tests__trend-strip`
+   sits on a collapsed kind row; the full `.tests__trend` section — grid plus
+   legend and pass-rate / streak summary — lives in the drill-down. Cell
+   colours are decided in TestTrendGrid.tsx (pass / partial / fail). */
+
+/* Compact inline strip — last N runs, oldest left, no wrap. */
+.tests__trend-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  margin-top: 7px;
+  overflow: hidden;
+}
+
+/* Full drill-down section. */
+.tests__trend {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px 11px;
+  border-radius: var(--ss-radius-sm);
+  border: 0.5px solid var(--ss-glass-line);
+  background: var(--ss-bg-3);
+}
+.tests__trend-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tests__trend-title {
+  font-family: var(--ss-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-fg-1);
+}
+.tests__trend-count {
+  font-size: 10.5px;
+  font-family: var(--ss-font-mono);
+  color: var(--ss-fg-3);
+}
+
+/* The wrapped square grid. */
+.tests__trend-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+/* One run square — shared by the strip, the grid, and the legend swatches. */
+.tests__trend-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2.5px;
+  flex-shrink: 0;
+  background: var(--ss-bg-4);
+}
+.tests__trend-grid .tests__trend-cell,
+.tests__trend-strip .tests__trend-cell {
+  cursor: help;
+}
+.tests__trend-strip .tests__trend-cell {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+.tests__trend-cell--pass {
+  background: var(--ss-ok);
+}
+.tests__trend-cell--partial {
+  background: var(--ss-warn);
+}
+.tests__trend-cell--fail {
+  background: var(--ss-fail);
+}
+/* The most recent run — an inset ring marks it without disturbing the grid. */
+.tests__trend-grid .tests__trend-cell--latest {
+  box-shadow: inset 0 0 0 1.5px var(--ss-fg-0);
+}
+.tests__trend-strip .tests__trend-cell--latest {
+  box-shadow: inset 0 0 0 1px var(--ss-fg-0);
+}
+
+/* Legend + pass-rate / streak / last-run summary. */
+.tests__trend-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.tests__trend-legend {
+  display: flex;
+  gap: 11px;
+}
+.tests__trend-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--ss-fg-3);
+}
+.tests__trend-legend-item .tests__trend-cell {
+  width: 9px;
+  height: 9px;
+}
+.tests__trend-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 10.5px;
+  font-family: var(--ss-font-mono);
+  color: var(--ss-fg-3);
+}
+.tests__trend-rate {
+  font-weight: 700;
+}
+.tests__trend-rate--ok {
+  color: var(--ss-ok);
+}
+.tests__trend-rate--warn {
+  color: var(--ss-warn);
+}
+.tests__trend-streak--ok {
+  color: var(--ss-fg-2);
+}
+.tests__trend-streak--fail {
+  color: var(--ss-fail);
+  font-weight: 600;
+}
+.tests__trend-last {
+  color: var(--ss-fg-3);
+}

@@ -1,0 +1,76 @@
+name = "sigmashake-workspace"
+main = "src/worker.ts"
+compatibility_date = "2026-05-15"
+compatibility_flags = ["nodejs_compat"]
+
+# `run_worker_first = true` so the auth middleware sees every request before
+# the assets binding can serve a static file. Without this flag the SPA bundle
+# (/assets/app.js, /assets/app.css) bypasses the worker and leaks to anyone
+# who knows the URL.
+[assets]
+directory = "public"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+WORKSPACE_ENV = "production"
+# GitHub user id of the operator allowed to access workspace.sigmashake.com.
+# Mirrors sigmashake-support's ALLOWED_GITHUB_USER_ID — same operator account,
+# same `session_id` cookie minted by accounts.sigmashake.com. Comma-separated
+# to support adding additional operators without redeploying code.
+ALLOWED_GITHUB_USER_IDS = "11810205"
+
+[[routes]]
+pattern = "workspace.sigmashake.com"
+custom_domain = true
+
+# ── Shared SESSIONS KV from accounts (read-only here) ────────────────────────
+# Holds `session:<id>` entries written by accounts.sigmashake.com SSO. The
+# auth gate reads this binding inside the worker to validate the
+# `.sigmashake.com` session_id cookie. Matches the same namespace id used by
+# sigmashake-support and sigmashake-calendar.
+[[kv_namespaces]]
+binding = "ACCOUNTS_SESSIONS"
+id = "28b7cc7730d1422caeda5fe8934ce73a"
+preview_id = "28b7cc7730d1422caeda5fe8934ce73a"
+
+# ── Service bindings: inbox sources ──────────────────────────────────────────
+# The unified Inbox view proxies through these. Cross-zone public fetches
+# inside sigmashake.com get silently dropped by the router (see
+# sigmashake-support/CLAUDE.md gotcha about the HUB binding) so support and
+# sales must be reached via service bindings, not HTTPS.
+[[services]]
+binding = "SUPPORT"
+service = "sigmashake-support"
+
+[[services]]
+binding = "SALES"
+service = "sigmashake-sales"
+
+# ── Service binding: observability board ─────────────────────────────────────
+# The Observability view proxies through this to sigmashake-observ's
+# /api/services endpoint. sigmashake-observ has no public route — a service
+# binding is the only way to reach it, and it sidesteps the same-zone fetch
+# drop. sigmashake-observ must be deployed before this Worker.
+[[services]]
+binding = "OBSERV"
+service = "sigmashake-observ"
+
+# ── Secrets (set via `wrangler secret put`) ──────────────────────────────────
+# SUPPORT_AGENT_TOKEN — Bearer ssk_agent_<hex64> for /agent/tickets reads +
+#                      inline triage. Provision via:
+#                        cd ../sigmashake-support
+#                        bun scripts/seed-agent.ts --name workspace-inbox \
+#                          --scopes read,respond,resolve
+#                      Then paste the printed token into:
+#                        wrangler secret put SUPPORT_AGENT_TOKEN
+# SALES_AGENT_TOKEN   — Bearer token gating sigmashake-sales /agent/leads*.
+#                      Must match the SALES_AGENT_TOKEN value pushed on
+#                      sigmashake-sales. Provision via:
+#                        token=$(openssl rand -hex 32)
+#                        echo "$token" | wrangler secret put SALES_AGENT_TOKEN
+#                        (then push the SAME value on sigmashake-sales)
+
+# Stream log/error events to sigmashake-alerts (same pattern as the other Workers).
+[[tail_consumers]]
+service = "sigmashake-alerts"

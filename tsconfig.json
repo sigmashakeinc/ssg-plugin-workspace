@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "src/client/**",
+    "src/build-registry.ts",
+    "src/build-infrastructure.ts",
+    "src/build-readiness.ts",
+    "vite.config.ts",
+    "vite.electrobun.config.ts",
+    "vite.vscode.config.ts",
+    "vite.plugin.config.ts",
+    "vscode/**",
+    "test/**"
+  ]
+}

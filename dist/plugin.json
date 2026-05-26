@@ -1,0 +1,20 @@
+{
+  "id": "workspace",
+  "version": "0.1.1",
+  "name": "Workspace",
+  "description": "Monorepo manager for SigmaShake — projects, health, run scripts, edit, distribution, platform parity matrix.",
+  "entry": "index.html",
+  "artifact_url": "__FILL_ME_IN__",
+  "artifact_sha256": "c761bb556688d2b8565eb1c9c473256fd3a36e66e302aa8e118ce427f51f21a7",
+  "artifact_signature": "4e267355f9938fdb7f36bb4b302d0223a26e4d2cc2fce8e29c64abd92019c642bb8cd89a8bf8cc502bec084ae3ea0b95ce7f11bef360cf3927db1a8947c91e03",
+  "signing_fingerprint": "302a300506032b6570032100fa27b2eba3b238546c2c6bb48358f6e376cf31c80ab23d4215cacfabfc6dbd55",
+  "min_ssg_version": "0.29.94",
+  "nav": [
+    {
+      "label": "Workspace",
+      "path": "/plugins/workspace/",
+      "section": "tools",
+      "order": 20
+    }
+  ]
+}
