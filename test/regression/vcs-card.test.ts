@@ -65,15 +65,16 @@ describe("sigmashake-vcs in the live registry", () => {
     expect(kinds.dependencies, "dependencies/ bucket missing").toBe(true);
   });
 
-  it("sorts alphabetically — sigmashake-vcs sits between -twitch-events and -vibe", () => {
+  it("sorts alphabetically — sigmashake-vcs sits between -vault and -vibe", () => {
     const slugs = PROJECTS_REGISTRY.map((p) => p.slug);
     const sorted = [...slugs].sort();
     expect(slugs).toEqual(sorted);
     const idx = slugs.indexOf("sigmashake-vcs");
     expect(idx).toBeGreaterThan(0);
-    // Adjacent neighbours are stable because all three slugs share the same
-    // length-prefix sort behaviour ("sigmashake-v…" cluster).
-    expect(slugs[idx - 1]).toBe("sigmashake-twitch-events");
+    // sigmashake-vault landed between -twitch-events and -vcs after the
+    // vault service moved into its own subproject — adjust the snapshot
+    // accordingly. All four share the "sigmashake-v…" cluster.
+    expect(slugs[idx - 1]).toBe("sigmashake-vault");
     expect(slugs[idx + 1]).toBe("sigmashake-vibe");
   });
 });

@@ -317,8 +317,7 @@ function resolveKind(
   // (kind.id is `string` in TestKindDef but every catalog entry's id is a
   // TestKindId; index via the narrower type so the Partial<Record<>> stays
   // typed without TS7053.)
-  const kindSentinel =
-    health?.lastTestByKind?.[kind.id as TestKindId] ?? null;
+  const kindSentinel = health?.lastTestByKind?.[kind.id as TestKindId] ?? null;
   // Legacy broad sentinel — historically only tracked the canonical `unit`
   // kind via `test` or `test:unit`. Kept as a fallback for projects whose
   // SSG daemon predates per-kind sentinels.
@@ -326,8 +325,7 @@ function resolveKind(
     category === "functional" &&
     kind.id === "unit" &&
     (script === "test" || script === "test:unit");
-  const broadHealthTs =
-    tracksBroadHealth && health?.lastTestAt != null ? health.lastTestAt : null;
+  const broadHealthTs = tracksBroadHealth && health?.lastTestAt != null ? health.lastTestAt : null;
   const localTs = lastRun?.startedAt ?? null;
   const kindTs = kindSentinel?.at ?? null;
   // Pick the freshest signal we have. Per-kind sentinels are preferred when
@@ -337,20 +335,19 @@ function resolveKind(
     ts: number;
     source: "kind" | "broad" | "local";
   }> = [];
-  if (kindTs != null) candidates.push({ts: kindTs, source: "kind"});
+  if (kindTs != null) candidates.push({ ts: kindTs, source: "kind" });
   // The broad `.last-test-result` is a whole-suite verdict (fail if ANY kind
   // failed), and it is written last — so it is always the "freshest" signal.
   // Once a per-kind `unit` sentinel exists it is strictly more accurate; the
   // broad sentinel must not override it, or a failure in some *other* kind
   // would wrongly colour `unit` as failing too.
   if (broadHealthTs != null && kindSentinel == null)
-    candidates.push({ts: broadHealthTs, source: "broad"});
-  if (localTs != null) candidates.push({ts: localTs, source: "local"});
+    candidates.push({ ts: broadHealthTs, source: "broad" });
+  if (localTs != null) candidates.push({ ts: localTs, source: "local" });
   candidates.sort((a, b) => {
     if (b.ts !== a.ts) return b.ts - a.ts;
     // Tie-break: kind > broad > local
-    const rank = (s: "kind" | "broad" | "local") =>
-      s === "kind" ? 0 : s === "broad" ? 1 : 2;
+    const rank = (s: "kind" | "broad" | "local") => (s === "kind" ? 0 : s === "broad" ? 1 : 2);
     return rank(a.source) - rank(b.source);
   });
   const winner = candidates[0];
@@ -375,7 +372,7 @@ function resolveKind(
 function resolveFromKindSentinel(
   kindId: string,
   script: string,
-  sentinel: {at: number; ok: boolean | null},
+  sentinel: { at: number; ok: boolean | null },
   now: number,
 ): TestKindResult {
   const ts = sentinel.at;

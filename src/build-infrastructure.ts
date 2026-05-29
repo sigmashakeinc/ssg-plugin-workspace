@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Scans every sibling project's wrangler config (.toml / .jsonc / .json) at
 // build time and emits src/infrastructure.generated.ts — a typed InfraGraph
-// consumed by the cloud Worker. Local + electrobun runtimes ignore this file
+// consumed by the cloud Worker. Local + plugin runtimes ignore this file
 // and call the SSG daemon's /api/json/workspace/infrastructure endpoint.
 //
 // Helpers are exported so test/build-infrastructure.test.ts can drive each

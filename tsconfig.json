@@ -19,7 +19,6 @@
     "src/build-infrastructure.ts",
     "src/build-readiness.ts",
     "vite.config.ts",
-    "vite.electrobun.config.ts",
     "vite.vscode.config.ts",
     "vite.plugin.config.ts",
     "vscode/**",

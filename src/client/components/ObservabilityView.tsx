@@ -2,7 +2,7 @@
 // every SigmaShake platform service, read from sigmashake-observ.
 //
 // Cloud-only by design: the workspace Worker holds the OBSERV service binding,
-// so local + electrobun + vscode runtimes render an "open in cloud" CTA.
+// so local + plugin + vscode runtimes render an "open in cloud" CTA.
 //
 // sigmashake-observ is a synthetic uptime monitor — it keeps state, not
 // history. This view surfaces exactly that: a current status per service, a
@@ -43,17 +43,17 @@ export function ObservabilityView({ client }: Props) {
           <div>
             <h3 className="panel__h3">Observability</h3>
             <p className="panel__muted">
-              One board for the health of every SigmaShake service — what is up, what is
-              down, and what changed.
+              One board for the health of every SigmaShake service — what is up, what is down, and
+              what changed.
             </p>
           </div>
         </header>
         <div className="state-card">
           <h2 className="state-card__title">Open Observability in the cloud</h2>
           <p className="state-card__body">
-            The health board is served by sigmashake-observ through a service binding that
-            only the workspace.sigmashake.com Cloudflare Worker holds. Open it in your
-            browser to see which services are healthy.
+            The health board is served by sigmashake-observ through a service binding that only the
+            workspace.sigmashake.com Cloudflare Worker holds. Open it in your browser to see which
+            services are healthy.
           </p>
           <p className="state-card__hints" style={{ marginTop: 16 }}>
             <a
@@ -119,8 +119,8 @@ export function ObservabilityView({ client }: Props) {
           <h3 className="panel__h3">Observability</h3>
           <p className="panel__muted">
             Live health of every SigmaShake platform service, probed every 5 minutes by
-            sigmashake-observ. Keeps state, not history — current status, a recent-checks
-            ring, and the incident log.
+            sigmashake-observ. Keeps state, not history — current status, a recent-checks ring, and
+            the incident log.
           </p>
         </div>
         <button
@@ -137,9 +137,7 @@ export function ObservabilityView({ client }: Props) {
       {neverProbed ? (
         <div className="observ__banner observ__banner--info">
           <strong>Awaiting the first probe.</strong>{" "}
-          <span>
-            sigmashake-observ runs every 5 minutes — the board fills in on the next tick.
-          </span>
+          <span>sigmashake-observ runs every 5 minutes — the board fills in on the next tick.</span>
         </div>
       ) : stale ? (
         <div className="observ__banner observ__banner--warn">

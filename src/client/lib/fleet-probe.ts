@@ -1,8 +1,7 @@
-// Shared Fleet control-plane probes. All three runtimes use this module to
+// Shared Fleet control-plane probes. Every runtime uses this module to
 // fill the `reachability` and `signInUrl` fields of FleetStatus and to fetch
 // the authed overview when the operator has connected an org. The enrollment
-// field is filled in by the daemon (local + electrobun) and left null in
-// cloud.
+// field is filled in by the daemon (local + plugin) and left null in cloud.
 //
 // Authed fetches go directly to `<slug>.fleet.sigmashake.com` with
 // `credentials: "include"`. The Fleet CORS allowlist + Access-Control-Allow-

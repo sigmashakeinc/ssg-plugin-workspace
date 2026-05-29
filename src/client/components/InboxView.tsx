@@ -3,7 +3,7 @@
 //   - sigmashake-sales leads (/agent/leads via service binding)
 //
 // Cloud-only by design: the proxy holds SUPPORT_AGENT_TOKEN + SALES_AGENT_TOKEN
-// secrets + the SUPPORT/SALES service bindings. Local + electrobun runtimes
+// secrets + the SUPPORT/SALES service bindings. Local + plugin runtimes
 // render an "Open in cloud" CTA instead of trying to fetch.
 //
 // Mutations supported inline:
@@ -62,8 +62,8 @@ export function InboxView({ client }: Props) {
   }, [slice]);
 
   // Cloud-only — the bearers + service bindings only exist on the workspace
-  // Worker. Local + electrobun + vscode runtimes get a friendly "open in
-  // cloud" CTA below.
+  // Worker. Local + plugin + vscode runtimes get a friendly "open in cloud"
+  // CTA below.
   const isCloud = client?.runtime === "cloud";
 
   if (!isCloud) {

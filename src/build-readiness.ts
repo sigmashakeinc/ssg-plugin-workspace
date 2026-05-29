@@ -14,7 +14,7 @@
 //                         SPA already explains "open SigmaShake Desktop" via
 //                         the `evidence` field.
 //
-// The local + electrobun + vscode + plugin runtimes still call the SSG daemon's
+// The local + vscode + plugin runtimes still call the SSG daemon's
 // /api/json/workspace/readiness for live cert-signal data. Only the cloud
 // runtime reads the generated snapshot.
 //

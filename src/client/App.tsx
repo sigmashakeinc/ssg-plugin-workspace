@@ -5,7 +5,9 @@ import type { ProjectCard, SessionInfo, WorkspaceSettings } from "./api/types";
 import { DEFAULT_WORKSPACE_SETTINGS } from "./api/types";
 import { AiNativeView } from "./components/AiNativeView";
 import { CertificationView } from "./components/CertificationView";
+import { CommandPalette } from "./components/CommandPalette";
 import { CreateProjectModal } from "./components/CreateProjectModal";
+import { DesktopUpdateBanner } from "./components/DesktopUpdateBanner";
 import { DistributionView } from "./components/DistributionView";
 import { FleetView } from "./components/FleetView";
 import { InboxView } from "./components/InboxView";
@@ -16,10 +18,19 @@ import { PlatformParityView } from "./components/PlatformParityView";
 import { ProductionReadinessView } from "./components/ProductionReadinessView";
 import { ProjectDetail } from "./components/ProjectDetail";
 import { ProjectGrid } from "./components/ProjectGrid";
+import { ProjectLinesModal } from "./components/ProjectLinesModal";
 import { ServicesEmptyState } from "./components/ServicesEmptyState";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { type VoiceActions, VoiceDock } from "./components/VoiceDock";
 import { friendlyError } from "./lib/errors";
+import {
+  LINE_LABEL,
+  type ProjectLine,
+  resolveLine,
+  withLineOverride,
+  withLineOverrides,
+} from "./lib/project-lines";
+import { useTheme } from "./lib/use-theme";
 import { useWorkspaceCache, WorkspaceCacheProvider } from "./lib/workspace-cache";
 
 const ROOT_LS_KEY = "ssg:workspace:root";
@@ -63,11 +74,18 @@ function readInitialRoot(): string {
 
 export function App() {
   const runtime = detectRuntime();
+  // Sync <html data-theme> with the user pref (or follow OS when "system"). The
+  // hook's return value isn't consumed here — SettingsPanel renders the picker.
+  useTheme();
   const [client, setClient] = useState<WorkspaceApiClient | null>(null);
   const [projects, setProjects] = useState<ProjectCard[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  // Production / non-production split — drives the rail's project list so the
+  // operator can look at just the platform or just the streaming op.
+  const [lineFilter, setLineFilter] = useState<ProjectLine | "all">("all");
+  const [linesEditorOpen, setLinesEditorOpen] = useState(false);
   const [root, setRoot] = useState(readInitialRoot);
   const [rootDraft, setRootDraft] = useState(readInitialRoot);
   const [loading, setLoading] = useState(true);
@@ -75,6 +93,10 @@ export function App() {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [settings, setSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // True while the user is dragging a folder over the window. Drives the
+  // visual drop-target highlight; reset on leave / drop. Platform parity id:
+  // drag-drop-files.
+  const [dropActive, setDropActive] = useState(false);
 
   const fetchProjects = useCallback(async (c: WorkspaceApiClient, targetRoot: string) => {
     setLoading(true);
@@ -134,6 +156,34 @@ export function App() {
     };
   }, [root, fetchProjects]);
 
+  // Native fullscreen toggle. F11 on Linux/Windows; Ctrl+Cmd+F on macOS (the
+  // canonical native shortcut, used by Safari + Finder + most macOS apps).
+  // Platform parity id: fullscreen-toggle.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const isMac = navigator.platform.toLowerCase().includes("mac");
+      const isMacShortcut =
+        isMac && event.ctrlKey && event.metaKey && event.key.toLowerCase() === "f";
+      const isF11 = !isMac && event.key === "F11";
+      if (!isMacShortcut && !isF11) return;
+      event.preventDefault();
+      const fs = document.fullscreenElement;
+      if (fs) {
+        void document.exitFullscreen().catch(() => {
+          /* user may have already exited */
+        });
+      } else {
+        void document.documentElement.requestFullscreen().catch((err) => {
+          // Webviews without fullscreen permission throw — log so the operator
+          // sees why nothing happened, but don't block the rest of the app.
+          console.warn("[workspace] fullscreen toggle denied:", err);
+        });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const applyRoot = useCallback((next: string) => {
     const trimmed = next.trim();
     try {
@@ -144,21 +194,108 @@ export function App() {
     setRoot(trimmed);
   }, []);
 
+  // Drag-drop a folder onto the window → apply it as the workspace root. Only
+  // the Electrobun + VS Code webviews populate `File.path` (non-standard
+  // Chromium extension); cloud + local-web get the visual feedback but cannot
+  // extract a filesystem path, so the drop turns into a hint pointing at the
+  // Browse… button. Platform parity id: drag-drop-files.
+  const onDropFolder = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setDropActive(false);
+      const file = event.dataTransfer.files[0];
+      if (!file) return;
+      const path = (file as File & { path?: string }).path;
+      if (path && path.length > 0) {
+        setRootDraft(path);
+        applyRoot(path);
+        return;
+      }
+      // Webview without File.path — surface a non-blocking hint via console so
+      // operators understand why nothing happened. Browse… is the fallback.
+      console.warn(
+        "[workspace] folder drop received but File.path is unavailable in this runtime; use Browse… instead",
+      );
+    },
+    [applyRoot],
+  );
+
+  const overrides = settings.lineOverrides;
+
   const filtered = useMemo(() => {
-    if (!filter.trim()) return projects;
-    const needle = filter.toLowerCase();
-    return projects.filter(
-      (p) => p.slug.toLowerCase().includes(needle) || p.description.toLowerCase().includes(needle),
-    );
-  }, [projects, filter]);
+    const needle = filter.trim().toLowerCase();
+    return projects.filter((p) => {
+      if (lineFilter !== "all" && resolveLine(p.slug, overrides) !== lineFilter) {
+        return false;
+      }
+      if (!needle) return true;
+      return p.slug.toLowerCase().includes(needle) || p.description.toLowerCase().includes(needle);
+    });
+  }, [projects, filter, lineFilter, overrides]);
+
+  // Headcount per line, so the rail toggle can show how the tree splits.
+  const lineCounts = useMemo(() => {
+    let production = 0;
+    let nonProduction = 0;
+    for (const p of projects) {
+      if (resolveLine(p.slug, overrides) === "production") production += 1;
+      else nonProduction += 1;
+    }
+    return { all: projects.length, production, "non-production": nonProduction };
+  }, [projects, overrides]);
+
+  // Move a project between lines. Persists through the same settings round-trip
+  // every runtime already uses (daemon ~/.sigmashake/workspace.json for
+  // local/plugin/vscode, localStorage for cloud), so the choice is durable.
+  const setProjectLine = useCallback(
+    async (slug: string, line: ProjectLine) => {
+      const nextOverrides = withLineOverride(overrides, slug, line);
+      // Optimistic — reflect immediately, then reconcile with the echoed write.
+      setSettings((cur) => ({ ...cur, lineOverrides: nextOverrides }));
+      if (!client) return;
+      try {
+        const saved = await client.setSettings({ lineOverrides: nextOverrides });
+        setSettings(saved);
+      } catch (err) {
+        setError(friendlyError(err));
+      }
+    },
+    [client, overrides],
+  );
+
+  // Bulk variant for the Organize modal — assign many slugs in one write.
+  const setProjectLines = useCallback(
+    async (updates: Record<string, ProjectLine>) => {
+      const nextOverrides = withLineOverrides(overrides, updates);
+      setSettings((cur) => ({ ...cur, lineOverrides: nextOverrides }));
+      if (!client) return;
+      try {
+        const saved = await client.setSettings({ lineOverrides: nextOverrides });
+        setSettings(saved);
+      } catch (err) {
+        setError(friendlyError(err));
+      }
+    },
+    [client, overrides],
+  );
+
+  // Drop every override so the tree falls back to the built-in auto split.
+  const resetProjectLines = useCallback(async () => {
+    setSettings((cur) => ({ ...cur, lineOverrides: {} }));
+    if (!client) return;
+    try {
+      const saved = await client.setSettings({ lineOverrides: {} });
+      setSettings(saved);
+    } catch (err) {
+      setError(friendlyError(err));
+    }
+  }, [client]);
 
   const selectedCard = projects.find((p) => p.slug === selected) ?? null;
-  // Electrobun runs the workspace UI in its own window — there's no SSG
-  // dashboard tab to go back to. The VS Code webview is a sandboxed iframe
-  // inside the editor, where navigating to "/" reloads the bundle instead
-  // of going anywhere useful. Cloud and local-web are the only runtimes
-  // where the back link points at a real page.
-  const canGoBack = runtime !== "electrobun" && runtime !== "vscode";
+  // The VS Code webview is a sandboxed iframe inside the editor, where
+  // navigating to "/" reloads the bundle instead of going anywhere useful.
+  // Cloud / local / plugin runtimes all have a real parent page to back to.
+  const canGoBack = runtime !== "vscode";
 
   const pickDirectory = useCallback(async () => {
     if (!client?.pickDirectory) return;
@@ -221,7 +358,33 @@ export function App() {
 
   return (
     <WorkspaceCacheProvider client={client} root={appliedRoot ?? root}>
-      <div className="app">
+      <DesktopUpdateBanner />
+      <div
+        className={"app" + (dropActive ? " app--drop-active" : "")}
+        onDragEnter={(event) => {
+          if (event.dataTransfer.types.includes("Files")) {
+            event.preventDefault();
+            setDropActive(true);
+          }
+        }}
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes("Files")) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDragLeave={(event) => {
+          // Fire only when leaving the outer container, not when crossing a
+          // child node (relatedTarget would still be inside us).
+          if (
+            event.currentTarget === event.target ||
+            !event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
+            setDropActive(false);
+          }
+        }}
+        onDrop={onDropFolder}
+      >
         <TopBar
           runtime={runtime}
           canGoBack={canGoBack}
@@ -257,6 +420,37 @@ export function App() {
                   .
                 </p>
               </div>
+            )}
+            {showStack && (
+              <button
+                type="button"
+                className="rail__cmdk"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("sigmashake:open-palette", {
+                      detail: { query: "" },
+                    }),
+                  );
+                }}
+                aria-label="Open command palette (Ctrl/Cmd+K)"
+                title="Search views, projects, actions (⌘K)"
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="7" cy="7" r="4.5" />
+                  <line x1="10.5" y1="10.5" x2="13.5" y2="13.5" />
+                </svg>
+                <span className="rail__cmdk-text">Search…</span>
+                <span className="rail__cmdk-kbd">⌘K</span>
+              </button>
             )}
             {showStack && canCreate && (
               <button
@@ -527,6 +721,39 @@ export function App() {
                   </span>
                   Distribution
                 </button>
+                <div
+                  className="rail__lines"
+                  role="group"
+                  aria-label="Filter projects by product line"
+                >
+                  {(["all", "production", "non-production"] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      className={`rail__line-tab${lineFilter === opt ? " rail__line-tab--active" : ""} rail__line-tab--${opt}`}
+                      aria-pressed={lineFilter === opt}
+                      onClick={() => setLineFilter(opt)}
+                      title={
+                        opt === "all"
+                          ? "Show every project"
+                          : `Show only ${LINE_LABEL[opt]} projects`
+                      }
+                    >
+                      <span className="rail__line-tab-label">
+                        {opt === "all" ? "All" : LINE_LABEL[opt]}
+                      </span>
+                      <span className="rail__line-tab-count">{lineCounts[opt]}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="rail__organize"
+                  onClick={() => setLinesEditorOpen(true)}
+                  title="Bulk-edit which projects are Production vs Non-production"
+                >
+                  Organize groups…
+                </button>
                 <input
                   type="search"
                   className="rail__filter"
@@ -534,7 +761,13 @@ export function App() {
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                 />
-                <ProjectGrid projects={filtered} selected={selected} onSelect={setSelected} />
+                <ProjectGrid
+                  projects={filtered}
+                  selected={selected}
+                  onSelect={setSelected}
+                  overrides={overrides}
+                  onSetLine={setProjectLine}
+                />
               </>
             )}
           </aside>
@@ -598,6 +831,15 @@ export function App() {
             onCreated={handleCreated}
           />
         )}
+        {linesEditorOpen && (
+          <ProjectLinesModal
+            projects={projects}
+            overrides={overrides}
+            onApply={setProjectLines}
+            onResetAll={resetProjectLines}
+            onClose={() => setLinesEditorOpen(false)}
+          />
+        )}
         {client && (settingsOpen || forceSettings) && (
           <SettingsPanel
             client={client}
@@ -611,6 +853,19 @@ export function App() {
           />
         )}
         <VoiceDock projects={projects} actions={voiceActions} />
+        <CommandPalette
+          projects={projects}
+          onSelectProject={(slug) => setSelected(slug)}
+          onSelectView={(slug) => setSelected(slug)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenCreate={() => {
+            if (canCreate) setCreateOpen(true);
+          }}
+          onRefresh={() => {
+            if (client) fetchProjects(client, root);
+          }}
+          onSetFilter={(v) => setFilter(v)}
+        />
       </div>
     </WorkspaceCacheProvider>
   );
@@ -725,11 +980,7 @@ function ReadinessNavButton({ active, onSelect }: ReadinessNavButtonProps) {
       </span>
       Readiness
       {hasData && ready ? (
-        <span
-          className="rail__nav-status"
-          aria-label="Production ready"
-          title="Production ready"
-        />
+        <span className="rail__nav-status" aria-label="Production ready" title="Production ready" />
       ) : null}
       {hasData && !ready ? (
         <span

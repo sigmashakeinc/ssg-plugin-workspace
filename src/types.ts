@@ -6,6 +6,19 @@
 
 export type ProjectType = "cf-worker" | "bun" | "elixir" | "native" | "unknown";
 
+/**
+ * Which product line a monorepo subproject belongs to. The monorepo fused two
+ * operations under one tree:
+ *   - "production"     — the SigmaShake governance platform (the B2B product we
+ *                        ship + sell): ssg, hub, accounts, fleet, billing, …
+ *   - "non-production" — the OBS / Twitch / YouTube streaming op (Navi, chat,
+ *                        clips, on-stream games) that markets the product.
+ * The split is operator-adjustable: a built-in default seed
+ * (src/client/lib/project-lines.ts) classifies every known slug, and
+ * `WorkspaceSettings.lineOverrides` lets the operator re-bucket any project.
+ */
+export type ProjectLine = "production" | "non-production";
+
 /** Stable ids for the 19 canonical test kinds. */
 export type TestKindId =
   // functional
@@ -66,12 +79,10 @@ export interface HealthSummary {
    * TestKindId finishes. Absent kinds fall back to "Never run" in the UI.
    *
    * The cloud Worker has no filesystem, so this field is always
-   * undefined on the cloud surface — local + electrobun + vscode runtimes
+   * undefined on the cloud surface — local + plugin + vscode runtimes
    * are the only ones that populate it.
    */
-  lastTestByKind?: Partial<
-    Record<TestKindId, {at: number; ok: boolean | null}>
-  >;
+  lastTestByKind?: Partial<Record<TestKindId, { at: number; ok: boolean | null }>>;
 }
 
 export interface RunEvent {
@@ -204,20 +215,9 @@ export interface DistEdge {
 // Produced by the SSG daemon's workspace-distribution-inventory.ts — keep this
 // mirror in lockstep with that module's exported shapes.
 
-export type DistProductId =
-  | "ssg-cli"
-  | "ssg-desktop"
-  | "vscode-ext"
-  | "plugins"
-  | "rulesets";
+export type DistProductId = "ssg-cli" | "ssg-desktop" | "vscode-ext" | "plugins" | "rulesets";
 
-export type DistArtifactStatus =
-  | "live"
-  | "building"
-  | "stale"
-  | "pending"
-  | "missing"
-  | "unknown";
+export type DistArtifactStatus = "live" | "building" | "stale" | "pending" | "missing" | "unknown";
 
 export interface DistChannelRef {
   /** Stable id — `npm`, `r2-cdn`, `vscode-marketplace`, … */
@@ -306,6 +306,66 @@ export interface DistributionData {
   inventory?: DistInventory;
 }
 
+/**
+ * Live cross-channel parity report for SigmaShake Desktop. Produced by the
+ * cloud Worker's `/api/workspace/distribution-drift` endpoint — see
+ * `src/distribution-drift.ts`. Decoupled from `DistributionData` because the
+ * parity probe is live (R2 + GitHub fetches) while DistributionData is the
+ * orchestrator-side build/inventory state.
+ */
+export type DistDriftLaneId = "linux-x64" | "win-x64" | "macos-x64" | "macos-arm64";
+
+export type DistDriftVerdict = "ok" | "stale" | "broken" | "missing" | "unknown";
+
+export interface DistDriftLane {
+  lane: DistDriftLaneId;
+  /** Version on R2's stable-<lane>-update.json (null if MISSING / fetch failed). */
+  r2Version: string | null;
+  /** HTTP status code on a HEAD of the primary blob (.dmg / .exe / .tar.zst). */
+  r2BlobHttp: number | null;
+  /** True when the latest GitHub release ships at least one stable-<lane>-* asset. */
+  ghHasAsset: boolean | null;
+  verdict: DistDriftVerdict;
+  /** Operator-readable one-liner. */
+  note: string;
+  /** Suggested catch-up command (e.g. "/publish desktop-only-mac"), or null when OK. */
+  catchUpCommand: string | null;
+}
+
+export type DistCliChannelId = "npm" | "pypi" | "cargo" | "github-cli";
+
+export type DistCliChannelVerdict = "ok" | "stale" | "unknown";
+
+export interface DistCliChannel {
+  channel: DistCliChannelId;
+  label: string;
+  /** Latest version the channel serves, or null when the registry didn't answer. */
+  version: string | null;
+  verdict: DistCliChannelVerdict;
+  note: string;
+  url: string;
+}
+
+export interface DistributionDrift {
+  generatedAt: string;
+  /** Latest GitHub release tag, or null if the GitHub API didn't answer. */
+  ghLatestTag: string | null;
+  /** Highest R2 update.json version observed — the de-facto "current" version. */
+  r2HighestVersion: string | null;
+  /** Number of lanes whose verdict !== "ok". */
+  driftedCount: number;
+  lanes: DistDriftLane[];
+  /** SSG CLI publish channels reachable from the browser-facing Worker. */
+  cliChannels: DistCliChannel[];
+  /** Number of CLI channels genuinely skewed (verdict === "stale"). */
+  cliDriftedCount: number;
+  /** Reference version every CLI channel is compared against (npm latest). */
+  cliReferenceVersion: string | null;
+  sources: { r2: boolean; github: boolean; cli: boolean };
+  /** Why apt/Flatpak/Docker aren't probed from the Worker (see the daemon view). */
+  cliNote: string;
+}
+
 export interface DistributionSyncResult {
   /** Orchestrator job id for the release that was kicked off. */
   jobId: string;
@@ -338,7 +398,7 @@ export interface SessionInfo {
 //                below it. Costs nothing extra once both registries coexist.
 //
 // The choice is per-operator and persists via the SSG daemon (local +
-// electrobun) or localStorage (cloud). Settings are bumped lazily — the
+// plugin) or localStorage (cloud / vscode). Settings are bumped lazily — the
 // settingsVersion field lets us migrate older payloads forward without
 // dropping unknown future keys.
 export type WorkspaceMode = "stack" | "services" | "hybrid";
@@ -360,6 +420,15 @@ export interface WorkspaceSettings {
    * flow instead.
    */
   fleetOrgSlug: string;
+  /**
+   * Per-project overrides for the production / non-production classification.
+   * Keyed by project slug (e.g. `sigmashake-obs`). An entry here wins over the
+   * built-in default seed in src/client/lib/project-lines.ts; a slug absent
+   * from this map falls back to its seeded default. This is the "adjustable"
+   * half of the split — moving a project between lines just writes/clears a
+   * key here and round-trips through the existing settings endpoint.
+   */
+  lineOverrides: Record<string, ProjectLine>;
   /** Epoch ms the settings were last written. Diagnostic only. */
   updatedAt: number;
 }
@@ -369,6 +438,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   mode: "stack",
   onboarded: false,
   fleetOrgSlug: "",
+  lineOverrides: {},
   updatedAt: 0,
 };
 
@@ -634,7 +704,12 @@ export type CertDimensionId =
   | "tests"
   | "security"
   | "build"
-  | "deploy";
+  | "deploy"
+  | "reliability"
+  | "operations"
+  | "supply_chain"
+  | "architecture"
+  | "privacy";
 
 export type CertLevel = "gold" | "silver" | "bronze" | "unfit";
 export type CertSignalState = "ok" | "warn" | "fail" | "missing" | "unknown";
@@ -1086,11 +1161,7 @@ export type AiLatencyTier =
 export type AiLatencyVerdict = "meets" | "acceptable" | "slow" | "unmeasured";
 
 /** How the latency number was obtained. */
-export type AiLatencyMeasurement =
-  | "loopback"
-  | "mcp-coldstart"
-  | "cli-coldstart"
-  | "none";
+export type AiLatencyMeasurement = "loopback" | "mcp-coldstart" | "cli-coldstart" | "none";
 
 export interface AiNativeSignal {
   /** Stable id — agent-docs · cli · mcp · json-api · integration. */

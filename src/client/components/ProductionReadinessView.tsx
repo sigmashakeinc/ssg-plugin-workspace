@@ -81,6 +81,135 @@ function timeAgo(epochMs: number): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+// ── Derived signals: priority + risk + importance ────────────────────────────
+// The API hands back `status`, `blocking`, `category` per requirement. The
+// expanded drill-down folds those into operator-facing badges + a paragraph
+// that explains *why* an AI agent should care, so the handoff prompt below
+// reads like an actual brief instead of a row dump.
+
+interface Badge {
+  label: string;
+  tone: Tone;
+}
+
+function computePriority(req: ReadinessRequirement): Badge {
+  if (req.status === "met") return { label: "Done", tone: "ok" };
+  if (req.blocking) {
+    if (req.status === "unmet") return { label: "P0 · Critical", tone: "err" };
+    if (req.status === "partial") return { label: "P1 · High", tone: "warn" };
+    return { label: "P2 · Verify", tone: "warn" };
+  }
+  return { label: "P3 · Recommended", tone: "muted" };
+}
+
+function computeRisk(req: ReadinessRequirement): Badge {
+  if (req.status === "met") return { label: "Cleared", tone: "ok" };
+  if (req.blocking) {
+    if (req.status === "unmet") return { label: "Severe — blocks release", tone: "err" };
+    if (req.status === "partial") return { label: "High — partial coverage", tone: "warn" };
+    return { label: "Unmeasured — verify before ship", tone: "warn" };
+  }
+  return { label: "Low — does not block", tone: "muted" };
+}
+
+const IMPORTANCE_PROSE: Record<ReadinessCategory, { blocking: string; recommended: string }> = {
+  quality: {
+    blocking: "Code correctness gate. A regression here ships defects straight to users.",
+    recommended: "Code-quality polish. Worth doing before the next release; not a blocker.",
+  },
+  security: {
+    blocking:
+      "Trust boundary. Customer data, credentials, or compliance posture is exposed if this fails.",
+    recommended:
+      "Defense-in-depth improvement. Tightens the security posture beyond the minimum bar.",
+  },
+  reliability: {
+    blocking:
+      "Uptime contract. A failure here drives on-call burden and customer-visible downtime.",
+    recommended:
+      "Operational resilience. Reduces failure modes that aren't yet on the critical path.",
+  },
+  release: {
+    blocking: "Ship pipeline. Without this the release process itself can't run end-to-end.",
+    recommended:
+      "Release ergonomics. Improves distribution surface area but does not block a release.",
+  },
+  compliance: {
+    blocking:
+      "Audit gate. Required for SOC 2 / customer due-diligence — affects deals, not just code.",
+    recommended:
+      "Compliance enrichment. Strengthens the audit narrative without being load-bearing.",
+  },
+  docs: {
+    blocking:
+      "Onboarding gate. Without this, customers and AI agents misuse or stall on the product.",
+    recommended: "Documentation polish. Improves clarity but is not a release blocker.",
+  },
+};
+
+function computeImportance(req: ReadinessRequirement): string {
+  return IMPORTANCE_PROSE[req.category][req.blocking ? "blocking" : "recommended"];
+}
+
+function buildAgentPrompt(args: {
+  req: ReadinessRequirement;
+  productName: string;
+  productProjects: string[];
+  priority: Badge;
+  risk: Badge;
+  importance: string;
+}): string {
+  const { req, productName, productProjects, priority, risk, importance } = args;
+  const lines: string[] = [];
+  lines.push(`# ${req.title}`);
+  lines.push("");
+  lines.push(`Product:      ${productName}`);
+  lines.push(`Requirement:  ${req.id}`);
+  lines.push(`Priority:     ${priority.label}`);
+  lines.push(`Risk:         ${risk.label}`);
+  lines.push(
+    `Severity:     ${req.blocking ? "Blocking — must be MET before ship" : "Recommended — does not block"}`,
+  );
+  lines.push(`Category:     ${CATEGORY_LABEL[req.category]}`);
+  if (productProjects.length > 0) {
+    lines.push(`Projects:     ${productProjects.join(", ")}`);
+  }
+  lines.push("");
+  lines.push("## Why this matters");
+  lines.push(importance);
+  if (req.detail) {
+    lines.push("");
+    lines.push(req.detail);
+  }
+  lines.push("");
+  lines.push("## Current state");
+  lines.push(`Status:   ${req.status.toUpperCase()}`);
+  lines.push(`Evidence: ${req.evidence}`);
+  if (req.source === "manual" && req.updatedAt) {
+    lines.push(`Last manually attested: ${req.updatedAt}`);
+  }
+  lines.push("");
+  lines.push("## What to do");
+  if (req.remediation) {
+    lines.push(req.remediation);
+  } else {
+    lines.push(
+      "No prepackaged remediation command. Investigate the evidence above; the underlying check is in the SSG daemon at GET /api/json/workspace/certify.",
+    );
+  }
+  lines.push("");
+  lines.push("## Definition of done");
+  lines.push("Re-scan via the local SSG daemon and confirm status flips to met:");
+  lines.push(
+    `  curl -s http://127.0.0.1:7901/api/json/workspace/readiness | jq '.products[].requirements[] | select(.id == "${req.id}")'`,
+  );
+  lines.push("");
+  lines.push(
+    "Do NOT edit .sigmashake/production-readiness.json to force-pass — the underlying signal must actually flip. For cert-signal checks the matching signal in /api/json/workspace/certify must also resolve to 'ok'.",
+  );
+  return lines.join("\n");
+}
+
 interface CategoryGroup {
   category: ReadinessCategory;
   items: ReadinessRequirement[];
@@ -158,47 +287,148 @@ function StatusPill({ status }: { status: ReadinessStatus }) {
   );
 }
 
-function RequirementRow({ req }: { req: ReadinessRequirement }) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showFix = req.status !== "met" && Boolean(req.remediation);
+function RequirementRow({
+  req,
+  productName,
+  productProjects,
+  isExpanded,
+  onToggle,
+}: {
+  req: ReadinessRequirement;
+  productName: string;
+  productProjects: string[];
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const [copiedFix, setCopiedFix] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const fixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const onCopy = async () => {
+  const priority = computePriority(req);
+  const risk = computeRisk(req);
+  const importance = computeImportance(req);
+  const showFix = req.status !== "met" && Boolean(req.remediation);
+  const showAgentPrompt = req.status !== "met";
+
+  const onCopyFix = async () => {
     if (!req.remediation) return;
     try {
       await navigator.clipboard.writeText(req.remediation);
     } catch {
       /* clipboard unavailable */
     }
-    setCopied(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setCopied(false), 1500);
+    setCopiedFix(true);
+    if (fixTimerRef.current) clearTimeout(fixTimerRef.current);
+    fixTimerRef.current = setTimeout(() => setCopiedFix(false), 1500);
+  };
+
+  const onCopyPrompt = async () => {
+    const prompt = buildAgentPrompt({
+      req,
+      productName,
+      productProjects,
+      priority,
+      risk,
+      importance,
+    });
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch {
+      /* clipboard unavailable */
+    }
+    setCopiedPrompt(true);
+    if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+    promptTimerRef.current = setTimeout(() => setCopiedPrompt(false), 1500);
   };
 
   return (
-    <li className={`rdy-req rdy-req--${STATUS_TONE[req.status]}`}>
-      <div className="rdy-req__top">
-        <StatusPill status={req.status} />
-        <span className="rdy-req__title" title={req.detail || undefined}>
-          {req.title}
-        </span>
+    <li
+      className={`rdy-req rdy-req--${STATUS_TONE[req.status]}${isExpanded ? " rdy-req--expanded" : ""}`}
+    >
+      <button type="button" className="rdy-req__head" aria-expanded={isExpanded} onClick={onToggle}>
         <span
-          className={`rdy-req__tag rdy-req__tag--${req.blocking ? "blocking" : "recommended"}`}
+          className={`rdy-req__chev${isExpanded ? " rdy-req__chev--open" : ""}`}
+          aria-hidden="true"
         >
+          ▸
+        </span>
+        <StatusPill status={req.status} />
+        <span className="rdy-req__title">{req.title}</span>
+        <span className={`rdy-req__tag rdy-req__tag--${req.blocking ? "blocking" : "recommended"}`}>
           {req.blocking ? "Blocking" : "Recommended"}
         </span>
-        <span className="rdy-req__src" title={req.source === "auto" ? "Resolved live" : "Manually attested"}>
+        <span className={`rdy-req__pri rdy-req__pri--${priority.tone}`}>{priority.label}</span>
+        <span
+          className="rdy-req__src"
+          title={req.source === "auto" ? "Resolved live" : "Manually attested"}
+        >
           {req.source === "auto" ? "auto" : "manual"}
           {req.updatedAt ? ` · ${req.updatedAt}` : ""}
         </span>
-      </div>
+      </button>
+
       <p className="rdy-req__evidence">{req.evidence}</p>
-      {showFix ? (
-        <div className="rdy-req__fix">
-          <code className="rdy-req__fix-cmd">{req.remediation}</code>
-          <button type="button" className="rdy-req__fix-copy" onClick={onCopy}>
-            {copied ? "Copied" : "Copy"}
-          </button>
+
+      {isExpanded ? (
+        <div className="rdy-req__drill">
+          {req.detail ? <p className="rdy-req__detail">{req.detail}</p> : null}
+
+          <dl className="rdy-req__facts">
+            <div className="rdy-fact">
+              <dt className="rdy-fact__label">Priority</dt>
+              <dd className={`rdy-fact__value rdy-fact__value--${priority.tone}`}>
+                {priority.label}
+              </dd>
+            </div>
+            <div className="rdy-fact">
+              <dt className="rdy-fact__label">Risk</dt>
+              <dd className={`rdy-fact__value rdy-fact__value--${risk.tone}`}>{risk.label}</dd>
+            </div>
+            <div className="rdy-fact">
+              <dt className="rdy-fact__label">Category</dt>
+              <dd className="rdy-fact__value">{CATEGORY_LABEL[req.category]}</dd>
+            </div>
+            <div className="rdy-fact">
+              <dt className="rdy-fact__label">Requirement ID</dt>
+              <dd className="rdy-fact__value rdy-fact__value--mono">{req.id}</dd>
+            </div>
+          </dl>
+
+          <div className="rdy-req__why">
+            <h5 className="rdy-req__why-title">Why this matters</h5>
+            <p className="rdy-req__why-body">{importance}</p>
+          </div>
+
+          {showFix ? (
+            <div className="rdy-req__fix">
+              <code className="rdy-req__fix-cmd">{req.remediation}</code>
+              <button type="button" className="rdy-req__fix-copy" onClick={onCopyFix}>
+                {copiedFix ? "Copied" : "Copy fix"}
+              </button>
+            </div>
+          ) : null}
+
+          {showAgentPrompt ? (
+            <div className="rdy-req__agent">
+              <div className="rdy-req__agent-head">
+                <h5 className="rdy-req__agent-title">Hand off to an AI coding agent</h5>
+                <button type="button" className="rdy-req__fix-copy" onClick={onCopyPrompt}>
+                  {copiedPrompt ? "Copied" : "Copy prompt"}
+                </button>
+              </div>
+              <pre className="rdy-req__agent-prompt">
+                {buildAgentPrompt({
+                  req,
+                  productName,
+                  productProjects,
+                  priority,
+                  risk,
+                  importance,
+                })}
+              </pre>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </li>
@@ -218,6 +448,21 @@ function ProductCard({
   const groups = useMemo(() => groupByCategory(visible), [visible]);
   const tone: Tone = product.ready ? "ok" : "err";
 
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const allVisibleIds = visible.map((r) => r.id);
+  const allExpanded = allVisibleIds.length > 0 && allVisibleIds.every((id) => expanded.has(id));
+  const toggleAll = () => {
+    setExpanded(allExpanded ? new Set() : new Set(allVisibleIds));
+  };
+
   return (
     <article className={`rdy-product rdy-product--${product.ready ? "ready" : "blocked"}`}>
       <header className="rdy-product__head">
@@ -233,9 +478,7 @@ function ProductCard({
             {product.blockerCount} blocker{product.blockerCount === 1 ? "" : "s"}
           </span>
         ) : (
-          <span className="rdy-product__blockers rdy-product__blockers--clear">
-            0 blockers
-          </span>
+          <span className="rdy-product__blockers rdy-product__blockers--clear">0 blockers</span>
         )}
       </header>
 
@@ -262,16 +505,30 @@ function ProductCard({
             : "No requirements defined for this product."}
         </p>
       ) : (
-        groups.map((g) => (
-          <section key={g.category} className="rdy-cat">
-            <h4 className="rdy-cat__title">{CATEGORY_LABEL[g.category]}</h4>
-            <ul className="rdy-cat__list">
-              {g.items.map((r) => (
-                <RequirementRow key={r.id} req={r} />
-              ))}
-            </ul>
-          </section>
-        ))
+        <>
+          <div className="rdy-product__tools">
+            <button type="button" className="rdy-product__expand" onClick={toggleAll}>
+              {allExpanded ? "Collapse all" : "Expand all"}
+            </button>
+          </div>
+          {groups.map((g) => (
+            <section key={g.category} className="rdy-cat">
+              <h4 className="rdy-cat__title">{CATEGORY_LABEL[g.category]}</h4>
+              <ul className="rdy-cat__list">
+                {g.items.map((r) => (
+                  <RequirementRow
+                    key={r.id}
+                    req={r}
+                    productName={product.name}
+                    productProjects={product.projects}
+                    isExpanded={expanded.has(r.id)}
+                    onToggle={() => toggle(r.id)}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </>
       )}
     </article>
   );
@@ -324,8 +581,8 @@ export function ProductionReadinessView() {
         <h2 className="rdy__empty-title">No production-readiness manifest</h2>
         <p className="rdy__empty-body">{data.manifestError}</p>
         <p className="rdy__empty-hint">
-          Create <code>.sigmashake/production-readiness.json</code> at the monorepo root to
-          define which requirements gate each product. The SSG daemon evaluates it live.
+          Create <code>.sigmashake/production-readiness.json</code> at the monorepo root to define
+          which requirements gate each product. The SSG daemon evaluates it live.
         </p>
         <button type="button" className="rdy__rescan" onClick={() => readiness.refresh()}>
           Re-scan
@@ -342,9 +599,7 @@ export function ProductionReadinessView() {
         <ProgressStrip
           loading={readiness.loading}
           label={
-            readiness.loading
-              ? "Refreshing in background"
-              : `Updated ${timeAgo(data.generatedAt)}`
+            readiness.loading ? "Refreshing in background" : `Updated ${timeAgo(data.generatedAt)}`
           }
         />
         <div className={`rdy__verdict rdy__verdict--${ready ? "ready" : "blocked"}`}>

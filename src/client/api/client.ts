@@ -11,6 +11,7 @@ import type {
   ContextUsage,
   CreateProjectRequest,
   DistributionData,
+  DistributionDrift,
   DistributionSyncResult,
   EditRequest,
   FleetOverview,
@@ -30,7 +31,7 @@ import type {
   WorkspaceSettings,
 } from "./types";
 
-export type Runtime = "cloud" | "local" | "electrobun" | "vscode" | "plugin";
+export type Runtime = "cloud" | "local" | "vscode" | "plugin";
 
 export interface RunHandle {
   jobId: string;
@@ -52,7 +53,7 @@ export interface WorkspaceApiClient {
    * /workspace/health endpoint stays cheap.
    *
    * Cloud raises CapabilityError — a Worker can't probe the operator's
-   * filesystem. Local + electrobun hit the SSG daemon's
+   * filesystem. Local hit the SSG daemon's
    * `/api/json/workspace/attention-details` endpoint.
    */
   getAttentionDetails(slug: string): Promise<AttentionDetails>;
@@ -66,7 +67,7 @@ export interface WorkspaceApiClient {
    * runtime, and (b) the UI has a concrete action to offer instead of just
    * explaining why AI isn't on it.
    *
-   * Cloud raises CapabilityError. Local + electrobun hit the SSG daemon.
+   * Cloud raises CapabilityError. Local hit the SSG daemon.
    */
   assignAi(
     slug: string,
@@ -77,10 +78,10 @@ export interface WorkspaceApiClient {
   readFile(project: string, file: EditRequest["file"]): Promise<string>;
   writeFile(req: EditRequest): Promise<void>;
   /**
-   * Open the OS native folder picker. Only available in the electrobun
-   * runtime (the cloud and local Web pages can't pop a native dialog —
-   * the user types the path manually instead). Returns null when the
-   * user cancels or the platform has no usable picker.
+   * Open the OS native folder picker. Currently unavailable in every runtime
+   * (cloud, local, vscode, plugin all run inside a webview without access to
+   * a native dialog API). The user types the path manually instead. Kept on
+   * the interface for the future plugin-host RPC bridge.
    */
   pickDirectory?(startDir?: string): Promise<string | null>;
   /**
@@ -93,19 +94,28 @@ export interface WorkspaceApiClient {
   /**
    * Return the deduped infrastructure graph for the workspace. Cloud
    * returns a build-time static snapshot of the public monorepo; local
-   * and electrobun scan the user's wrangler.toml files live.
+   * scans the user's wrangler.toml files live.
    */
   listInfrastructure(root?: string): Promise<InfraGraph>;
   /**
    * Read-only cross-channel release status for the SigmaShake distribution
    * — SSG CLI + SSG Desktop across the build pipeline, npm, the download
-   * CDN, and the public download page. Local + electrobun read it live from
+   * CDN, and the public download page. Local read it live from
    * the SSG daemon; the cloud client raises CapabilityError.
    */
   getDistribution(root?: string): Promise<DistributionData>;
   /**
+   * Live cross-channel parity probe for SigmaShake Desktop. Polls the R2 CDN
+   * (update.json + blob HEAD per lane) and the latest GitHub release to
+   * detect lanes that are STALE / BROKEN / MISSING. Returns the same data
+   * shape regardless of runtime; the cloud Worker is the canonical source
+   * because the CDN + GitHub API block cross-origin browser fetches. Local
+   * + plugin + vscode runtimes proxy to the cloud endpoint.
+   */
+  getDistributionDrift(): Promise<DistributionDrift>;
+  /**
    * Kick off a coordinated multi-platform release through the orchestrator.
-   * Mutating — local + electrobun only; the cloud client raises
+   * Mutating — local only; the cloud client raises
    * CapabilityError. Throws if a release is already in progress.
    */
   triggerSync(): Promise<DistributionSyncResult>;
@@ -113,14 +123,14 @@ export interface WorkspaceApiClient {
    * Identity of the currently signed-in viewer. The cloud runtime hits
    * /api/session/me on accounts.sigmashake.com — if the cookie isn't valid
    * the auth gate has already redirected away, so a successful App load
-   * implies this returns a session. Local + electrobun runtimes are gated
+   * implies this returns a session. Local runtimes are gated
    * by the SSG dashboard token instead and return a stub identifying the
    * local operator.
    */
   getSession(): Promise<SessionInfo | null>;
   /**
    * Read the operator's WorkspaceSettings (mode picker + onboarding state).
-   * Cloud: backed by localStorage. Local + electrobun: read from the SSG
+   * Cloud: backed by localStorage. Local: read from the SSG
    * daemon's `~/.sigmashake/workspace.json` so the choice survives a
    * browser cache wipe, with a localStorage fallback if the daemon route
    * 404s on an older SigmaShake. Never throws — returns DEFAULT_WORKSPACE_SETTINGS
@@ -137,13 +147,13 @@ export interface WorkspaceApiClient {
    * Per-project breakdown of agent-instruction context — every CLAUDE.md,
    * AGENTS.md, .cursorrules, skill, memory page, and governance rule that
    * the AI agent has to ingest while working in this subproject. Bytes +
-   * estimated tokens for each entry. Local + electrobun read the live tree;
+   * estimated tokens for each entry. Local read the live tree;
    * the cloud client raises CapabilityError (no filesystem access).
    */
   getContextUsage(project: string): Promise<ContextUsage>;
   /**
    * Read-only Fleet control-plane status. Phase 1 probes the public
-   * `/api/health` endpoint and (in local + electrobun runtimes) surfaces
+   * `/api/health` endpoint and (in local runtimes) surfaces
    * this-machine agent enrollment from the SSG daemon. The cloud runtime
    * returns enrollment=null because the browser can't see local agent state.
    * Never throws — falls back to reachability="unknown" so the panel can
@@ -162,12 +172,12 @@ export interface WorkspaceApiClient {
    * <slug>.fleet.sigmashake.com to mint a 5-minute enrollment grant, hands
    * it to the local SSG daemon, and the daemon writes the resulting agent
    * JWT to disk. Returns the refreshed FleetStatus so the panel can flip
-   * straight to "Connected". Local + electrobun only — cloud + vscode raise
+   * straight to "Connected". Local only — cloud + vscode raise
    * CapabilityError because there's no daemon to receive the JWT.
    */
   autoEnrollFleet(slug: string, label?: string): Promise<FleetStatus>;
   /**
-   * Cross-service SDLC certification report. Local + electrobun hit the SSG
+   * Cross-service SDLC certification report. Local hit the SSG
    * daemon's `/api/json/workspace/certify` endpoint, which runs the
    * filesystem-only scanner against every project. The cloud client raises
    * CapabilityError — a Worker can't read the operator's tree.
@@ -177,7 +187,7 @@ export interface WorkspaceApiClient {
    * Per-service AI-native readiness — five capability signals (agent docs,
    * CLI, MCP server, JSON API, agent integration) plus a latency gauge that
    * measures loopback round-trips where the service declares a port, and
-   * classifies by architecture otherwise. Local + electrobun hit the SSG
+   * classifies by architecture otherwise. Local hit the SSG
    * daemon's `/api/json/workspace/ai-native` endpoint, which scans the
    * filesystem and probes localhost. The cloud client raises CapabilityError
    * — a Worker can't read the operator's tree or probe their loopback.
@@ -188,7 +198,7 @@ export interface WorkspaceApiClient {
    * `.sigmashake/production-readiness.json` and resolves each requirement
    * against the SDLC cert scanner + the filesystem, so an operator can see
    * whether Fleet / SSG / SigmaShake Desktop are production-ready at any
-   * time. Local + electrobun hit the SSG daemon's
+   * time. Local hit the SSG daemon's
    * `/api/json/workspace/readiness` endpoint; the cloud client raises
    * CapabilityError — a Worker can't read the operator's tree.
    */
@@ -200,7 +210,7 @@ export interface WorkspaceApiClient {
    * tail, parsed by the SSG daemon from the last `/workspace/run` of that
    * kind's script and persisted as `.last-test-report-<kind>.json`.
    *
-   * Local + electrobun + vscode read it from the daemon. The cloud client
+   * Local + vscode read it from the daemon. The cloud client
    * raises CapabilityError — a Worker has no filesystem to read reports from.
    */
   getTestReport(slug: string): Promise<TestReportBundle>;
@@ -208,7 +218,7 @@ export interface WorkspaceApiClient {
    * Unified Inbox snapshot — open support tickets + new sales leads in one
    * call. Cloud only: the workspace worker holds the support agent bearer +
    * the sales service binding, so the browser never touches either directly.
-   * Local + electrobun runtimes raise CapabilityError; the panel shows a
+   * Local runtimes raise CapabilityError; the panel shows a
    * "Open in cloud" fallback so operators can still reach it from desktop.
    */
   getInbox(): Promise<InboxSnapshot>;
@@ -225,12 +235,12 @@ export interface WorkspaceApiClient {
    * platform service's current status, its recent-checks ring, and the
    * incident log. Cloud only: the workspace Worker holds the OBSERV service
    * binding, so the browser never reaches sigmashake-observ directly. Local +
-   * electrobun + vscode runtimes raise CapabilityError; the panel shows an
-   * "open in cloud" fallback.
+   * vscode runtimes raise CapabilityError; the panel shows an "open in cloud"
+   * fallback.
    */
   getObservability(): Promise<ObservBoard>;
   /**
-   * Cross-OS desktop feature-parity matrix. Local + electrobun + vscode
+   * Cross-OS desktop feature-parity matrix. Local + vscode
    * runtimes hit the SSG daemon, which resolves the catalog against this
    * host (auto-probes where it can) and merges in persisted results from
    * sibling OS hosts via `~/.sigmashake/platform-parity.json`. The cloud
@@ -242,17 +252,41 @@ export interface WorkspaceApiClient {
   /**
    * Kick off the auto-probe suite on this host. Each auto check writes its
    * result into the persistence file under the OS column of the host that
-   * ran it. Returns the refreshed snapshot. Local + electrobun + vscode
+   * ran it. Returns the refreshed snapshot. Local + vscode
    * only — the cloud runtime raises CapabilityError.
    */
   runPlatformParity(req?: PlatformParityRunRequest): Promise<PlatformParityResponse>;
   /**
    * Record a manual attestation for one (feature × OS) cell. Used when the
    * operator has just verified a check that doesn't have an auto-probe (or
-   * to override an auto verdict with field evidence). Local + electrobun +
+   * to override an auto verdict with field evidence). Local +
    * vscode only — the cloud runtime raises CapabilityError.
    */
   attestPlatformParity(req: PlatformParityAttestRequest): Promise<PlatformParityResponse>;
+  /**
+   * Re-run the workspace sentinel refresher (lint/format/typecheck/audit/build
+   * /test + ai-native-latency) so the SDLC cert scanner stops grading every
+   * service as stale. Drives `shared/agent-config/scripts/refresh-workspace-
+   * sentinels.ts` via the daemon's `/api/json/workspace/refresh-sentinels`
+   * endpoint and returns a RunHandle whose async iterator yields the script's
+   * progress lines until done. The button in CertificationView calls this then
+   * re-fetches the cert report.
+   *
+   * Local + vscode hit the daemon; cloud raises CapabilityError
+   * (the script can't run inside a Worker).
+   */
+  refreshSentinels(opts?: RefreshSentinelsOptions): Promise<RunHandle>;
+}
+
+export interface RefreshSentinelsOptions {
+  /** Restrict the sweep to one service. Default: every sigmashake-* dir. */
+  project?: string;
+  /** Restrict to a subset of kinds. Default: all six. */
+  kinds?: Array<"format" | "lint" | "typecheck" | "audit" | "build" | "test">;
+  /** Re-run kinds whose sentinel was rewritten <24h ago. Default: false. */
+  force?: boolean;
+  /** Skip the root-level ai-native-latency refresh at the end. */
+  skipAiNative?: boolean;
 }
 
 export class CapabilityError extends Error {
@@ -279,11 +313,6 @@ export async function getClient(): Promise<WorkspaceApiClient> {
     case "plugin": {
       const { createLocalClient } = await import("./local");
       cached = createLocalClient();
-      break;
-    }
-    case "electrobun": {
-      const { createElectrobunClient } = await import("./electrobun");
-      cached = createElectrobunClient();
       break;
     }
     case "vscode": {

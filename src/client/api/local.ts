@@ -8,7 +8,12 @@ import {
   mintEnrollmentGrant,
   probeFleetReachability,
 } from "../lib/fleet-probe";
-import { CapabilityError, type RunHandle, type WorkspaceApiClient } from "./client";
+import {
+  CapabilityError,
+  type RefreshSentinelsOptions,
+  type RunHandle,
+  type WorkspaceApiClient,
+} from "./client";
 import {
   mergeSettings,
   normalizeSettings,
@@ -223,6 +228,15 @@ export function createLocalClient(): WorkspaceApiClient {
       assertJsonResponse(res, "The Distribution view");
       return res.json();
     },
+    async getDistributionDrift() {
+      // The drift probe lives on the cloud Worker because R2 + GitHub block
+      // cross-origin browser fetches; the local SSG daemon doesn't carry the
+      // probe itself. We always hit the public Worker URL — drift state is
+      // identical regardless of which runtime is asking.
+      const res = await fetch("https://workspace.sigmashake.com/api/workspace/distribution-drift");
+      if (!res.ok) throw new Error(`distribution-drift: ${res.status}`);
+      return res.json();
+    },
     async triggerSync(): Promise<DistributionSyncResult> {
       const { origin } = config();
       const res = await fetch(`${origin}/api/json/workspace/distribution/sync`, {
@@ -427,9 +441,30 @@ export function createLocalClient(): WorkspaceApiClient {
       const body = (await res.json()) as { snapshot: PlatformParityResponse };
       return body.snapshot;
     },
-    async attestPlatformParity(
-      req: PlatformParityAttestRequest,
-    ): Promise<PlatformParityResponse> {
+    async refreshSentinels(opts?: RefreshSentinelsOptions): Promise<RunHandle> {
+      const { origin } = config();
+      const url = urlWithRoot(origin, "/api/json/workspace/refresh-sentinels");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(opts ?? {}),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `refresh-sentinels: ${res.status}`);
+      }
+      const { jobId } = (await res.json()) as { jobId: string };
+      return {
+        jobId,
+        events: streamRefreshSentinels(origin, jobId),
+        // Cancel isn't wired on the daemon side — the sweep is short-lived
+        // (single-shot script, no per-kind cancellation), so the contract is
+        // satisfied with a no-op rather than a fake "OK" that wouldn't stop
+        // the work.
+        async cancel() {},
+      };
+    },
+    async attestPlatformParity(req: PlatformParityAttestRequest): Promise<PlatformParityResponse> {
       const { origin } = config();
       const res = await fetch(`${origin}/api/json/workspace/platform-parity/attest`, {
         method: "POST",
@@ -474,7 +509,19 @@ async function readLocalEnrollment(origin: string): Promise<FleetEnrollment | nu
 }
 
 async function* streamRun(origin: string, jobId: string) {
-  const res = await fetch(`${origin}/api/json/workspace/run/${jobId}/stream`, {
+  yield* streamSSE(`${origin}/api/json/workspace/run/${jobId}/stream`);
+}
+
+async function* streamRefreshSentinels(origin: string, jobId: string) {
+  yield* streamSSE(`${origin}/api/json/workspace/refresh-sentinels/${jobId}/stream`);
+}
+
+// Shared SSE reader for the {line,done,exitCode?} contract every /workspace/*
+// job stream emits. Yields one event per `data: …\n\n` block until the
+// server sends `done: true` (or the body ends), at which point the iterator
+// terminates so a `for await` loop in the caller resolves.
+async function* streamSSE(url: string) {
+  const res = await fetch(url, {
     headers: headers({ Accept: "text/event-stream" }),
   });
   if (!res.body) throw new Error("stream: no body");

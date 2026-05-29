@@ -56,6 +56,33 @@ service = "sigmashake-sales"
 binding = "OBSERV"
 service = "sigmashake-observ"
 
+# ── Cross-OS platform parity matrix store ────────────────────────────────────
+# Each operator host (linux / darwin / win32) writes its column to this KV on
+# attest, and reads sibling columns back on snapshot build. That's how the
+# workspace UI shows a true 3-OS matrix even though each machine only resolves
+# its own row live. Reads are operator-gated (session cookie); writes are
+# bearer-gated (PARITY_AGENT_TOKEN) so the daemon — which has no session — can
+# still push. Bootstrap on first deploy:
+#   wrangler kv namespace create PARITY_MATRIX
+#   # paste the printed id below
+#   wrangler kv namespace create PARITY_MATRIX --preview
+#   # paste the printed preview_id below
+[[kv_namespaces]]
+binding = "PARITY_MATRIX"
+id = "6f8bfedca2d5496d94c867ff16ea1df8"
+preview_id = "9ad30b7017d04cdc8b5069516f3ecc3f"
+
+# ── DOWNLOADS R2 binding (read-only) ─────────────────────────────────────────
+# Same R2 bucket sigmashake-download/sigmashake-web mount. Used by the
+# distribution-drift probe to read stable-<lane>-update.json keys directly —
+# direct HTTPS to download.sigmashake.com fails with HTTP 522 because both
+# Workers live on the same sigmashake.com zone (Cloudflare drops same-zone
+# Worker fetches; documented in src/distribution-drift.ts + sigmashake-web's
+# api/desktop-versions.ts). R2 bindings sidestep that entirely.
+[[r2_buckets]]
+binding = "DOWNLOADS"
+bucket_name = "sigmashake-downloads"
+
 # ── Secrets (set via `wrangler secret put`) ──────────────────────────────────
 # SUPPORT_AGENT_TOKEN — Bearer ssk_agent_<hex64> for /agent/tickets reads +
 #                      inline triage. Provision via:
@@ -70,6 +97,13 @@ service = "sigmashake-observ"
 #                        token=$(openssl rand -hex 32)
 #                        echo "$token" | wrangler secret put SALES_AGENT_TOKEN
 #                        (then push the SAME value on sigmashake-sales)
+# PARITY_AGENT_TOKEN  — Bearer presented by each SSG daemon on
+#                      /api/workspace/parity-matrix reads + writes. Provision:
+#                        token=$(openssl rand -hex 32)
+#                        echo "$token" | wrangler secret put PARITY_AGENT_TOKEN
+#                        # then on every operator host (linux/mac/win):
+#                        umask 077 && echo "$token" \
+#                          > ~/.sigmashake/workspace-parity-token
 
 # Stream log/error events to sigmashake-alerts (same pattern as the other Workers).
 [[tail_consumers]]

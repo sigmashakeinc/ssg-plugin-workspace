@@ -248,13 +248,34 @@
   gap: 6px;
 }
 
+/* ── Product card tools ── */
+.rdy-product__tools {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2px 0 8px;
+}
+.rdy-product__expand {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--ss-glass-line);
+  background: transparent;
+  color: var(--ss-fg-2);
+  cursor: pointer;
+}
+.rdy-product__expand:hover {
+  border-color: var(--ss-fg-3);
+  color: var(--ss-fg-1, #ededed);
+}
+
 /* ── Requirement row ── */
 .rdy-req {
   border: 1px solid var(--ss-glass-line);
   border-left-width: 3px;
   border-radius: 8px;
-  padding: 8px 11px;
   background: var(--ss-glass-2, rgba(255, 255, 255, 0.03));
+  overflow: hidden;
 }
 .rdy-req--ok {
   border-left-color: rgba(80, 200, 120, 0.55);
@@ -268,11 +289,38 @@
 .rdy-req--muted {
   border-left-color: var(--ss-fg-3);
 }
-.rdy-req__top {
+.rdy-req--expanded {
+  background: var(--ss-glass-1);
+}
+
+/* Clickable head row (was .rdy-req__top — now a real button for a11y). */
+.rdy-req__head {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 8px 11px 4px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.rdy-req__head:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.rdy-req__chev {
+  display: inline-block;
+  width: 10px;
+  font-size: 10px;
+  color: var(--ss-fg-3);
+  transition: transform 120ms ease;
+  flex: none;
+}
+.rdy-req__chev--open {
+  transform: rotate(90deg);
 }
 .rdy-req__title {
   font-size: 13px;
@@ -295,6 +343,36 @@
   color: var(--ss-fg-3);
   background: var(--ss-glass-2, rgba(255, 255, 255, 0.05));
 }
+/* Priority badge — sits next to the blocking/recommended tag, color follows tone. */
+.rdy-req__pri {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1.5px 7px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.rdy-req__pri--ok {
+  color: #7fd49a;
+  border-color: rgba(80, 200, 120, 0.4);
+  background: rgba(80, 200, 120, 0.08);
+}
+.rdy-req__pri--warn {
+  color: #f0c14b;
+  border-color: rgba(255, 196, 0, 0.4);
+  background: rgba(255, 196, 0, 0.08);
+}
+.rdy-req__pri--err {
+  color: #f08c87;
+  border-color: rgba(232, 84, 76, 0.45);
+  background: rgba(232, 84, 76, 0.08);
+}
+.rdy-req__pri--muted {
+  color: var(--ss-fg-3);
+  border-color: var(--ss-glass-line);
+}
 .rdy-req__src {
   margin-left: auto;
   font-size: 10px;
@@ -303,16 +381,89 @@
   white-space: nowrap;
 }
 .rdy-req__evidence {
-  margin: 5px 0 0;
+  margin: 0;
+  padding: 0 11px 8px;
   font-size: 11.5px;
   line-height: 1.45;
+  color: var(--ss-fg-2);
+}
+
+/* ── Drill-down panel ── */
+.rdy-req__drill {
+  padding: 4px 11px 11px;
+  border-top: 1px solid var(--ss-glass-line);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.rdy-req__detail {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ss-fg-2);
+}
+.rdy-req__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 14px;
+  margin: 0;
+}
+.rdy-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rdy-fact__label {
+  margin: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ss-fg-3);
+}
+.rdy-fact__value {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ss-fg-1, #ededed);
+}
+.rdy-fact__value--ok {
+  color: #7fd49a;
+}
+.rdy-fact__value--warn {
+  color: #f0c14b;
+}
+.rdy-fact__value--err {
+  color: #f08c87;
+}
+.rdy-fact__value--muted {
+  color: var(--ss-fg-3);
+}
+.rdy-fact__value--mono {
+  font-family: var(--ss-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+.rdy-req__why {
+  border-left: 2px solid var(--ss-glass-line);
+  padding-left: 10px;
+}
+.rdy-req__why-title {
+  margin: 0 0 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ss-fg-3);
+}
+.rdy-req__why-body {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--ss-fg-2);
 }
 .rdy-req__fix {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-top: 7px;
 }
 .rdy-req__fix-cmd {
   flex: 1;
@@ -340,6 +491,43 @@
 }
 .rdy-req__fix-copy:hover {
   border-color: var(--ss-fg-3);
+}
+
+/* AI agent handoff block — a copyable structured brief. */
+.rdy-req__agent {
+  border: 1px solid var(--ss-glass-line);
+  border-radius: 7px;
+  background: var(--ss-glass-2, rgba(255, 255, 255, 0.04));
+  overflow: hidden;
+}
+.rdy-req__agent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ss-glass-line);
+  background: rgba(255, 255, 255, 0.02);
+}
+.rdy-req__agent-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-fg-2);
+}
+.rdy-req__agent-prompt {
+  margin: 0;
+  padding: 9px 12px;
+  font-family: var(--ss-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--ss-fg-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 /* ── Status pill ── */

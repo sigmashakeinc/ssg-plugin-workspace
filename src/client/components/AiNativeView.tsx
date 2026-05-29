@@ -47,8 +47,7 @@ const TIER_LABELS: Record<AiNativeTier, string> = {
 };
 
 const TIER_BLURB: Record<AiNativeTier, string> = {
-  native:
-    "Agents can discover, drive, and reason about this service end-to-end.",
+  native: "Agents can discover, drive, and reason about this service end-to-end.",
   capable: "An agent has real control surfaces but a gap or two remains.",
   partial: "An agent can reach it, but only awkwardly — key surfaces missing.",
   opaque: "Effectively closed to agents — they'd have to reverse-engineer it.",
@@ -100,8 +99,7 @@ const TIER_RANK: Record<AiNativeTier, number> = {
 
 function gapCount(report: AiNativeReport): number {
   // `na` — a signal that does not apply to this architecture — is not a gap.
-  return report.signals.filter((s) => s.state !== "ok" && s.state !== "na")
-    .length;
+  return report.signals.filter((s) => s.state !== "ok" && s.state !== "na").length;
 }
 
 /** Concern rank for the "latency" sort — slow + unmeasured float to the top. */
@@ -133,9 +131,7 @@ function timeAgo(epochMs: number): string {
 
 function TierBadge({ tier, large = false }: { tier: AiNativeTier; large?: boolean }) {
   return (
-    <span
-      className={`ain__tier ain__tier--${tier}${large ? " ain__tier--large" : ""}`}
-    >
+    <span className={`ain__tier ain__tier--${tier}${large ? " ain__tier--large" : ""}`}>
       {TIER_LABELS[tier]}
     </span>
   );
@@ -167,15 +163,10 @@ function LatencyChip({ gauge }: { gauge: AiLatencyGauge }) {
       ? formatLatency(gauge.observedMs)
       : (LATENCY_TIERS.find((t) => t.id === gauge.tier)?.short ?? "—");
   return (
-    <span
-      className={`ain__lat-chip ain__lat-chip--${gauge.verdict}`}
-      title={gauge.note}
-    >
+    <span className={`ain__lat-chip ain__lat-chip--${gauge.verdict}`} title={gauge.note}>
       <span className="ain__lat-chip-dot" aria-hidden="true" />
       {text}
-      {gauge.observedMs === null ? (
-        <span className="ain__lat-chip-tag">expected</span>
-      ) : null}
+      {gauge.observedMs === null ? <span className="ain__lat-chip-tag">expected</span> : null}
     </span>
   );
 }
@@ -214,9 +205,7 @@ function LatencyGaugePanel({ gauge }: { gauge: AiLatencyGauge }) {
             }
           >
             <span className="ain__track-short">{t.short}</span>
-            {i === targetIdx ? (
-              <span className="ain__track-goal">goal</span>
-            ) : null}
+            {i === targetIdx ? <span className="ain__track-goal">goal</span> : null}
           </div>
         ))}
       </div>
@@ -262,12 +251,7 @@ function ServiceRow({
     <article
       className={`ain__svc ain__svc--${report.tier}${expanded ? " ain__svc--expanded" : ""}`}
     >
-      <button
-        type="button"
-        className="ain__svc-row"
-        onClick={onToggle}
-        aria-expanded={expanded}
-      >
+      <button type="button" className="ain__svc-row" onClick={onToggle} aria-expanded={expanded}>
         <span className={`ain__svc-stripe ain__svc-stripe--${report.tier}`} />
         <TierBadge tier={report.tier} />
         <span className="ain__svc-slug">{report.slug}</span>
@@ -332,16 +316,10 @@ export function AiNativeView({ client }: Props) {
     if (!data) return [];
     const list = Object.values(data.reports);
     if (sort === "tier-asc") {
-      return [...list].sort(
-        (a, b) =>
-          TIER_RANK[a.tier] - TIER_RANK[b.tier] || a.score - b.score,
-      );
+      return [...list].sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier] || a.score - b.score);
     }
     if (sort === "tier-desc") {
-      return [...list].sort(
-        (a, b) =>
-          TIER_RANK[b.tier] - TIER_RANK[a.tier] || b.score - a.score,
-      );
+      return [...list].sort((a, b) => TIER_RANK[b.tier] - TIER_RANK[a.tier] || b.score - a.score);
     }
     if (sort === "score-desc") {
       return [...list].sort((a, b) => b.score - a.score);
@@ -389,11 +367,7 @@ export function AiNativeView({ client }: Props) {
         </h2>
         <p className="ain__empty-body">{friendlyError(slice.error)}</p>
         {!cloud ? (
-          <button
-            type="button"
-            className="ain__retry"
-            onClick={() => slice.refresh()}
-          >
+          <button type="button" className="ain__retry" onClick={() => slice.refresh()}>
             Retry scan
           </button>
         ) : null}
@@ -445,26 +419,22 @@ export function AiNativeView({ client }: Props) {
               <TierCount tier="opaque" count={tierCounts.opaque} />
             </p>
             <p className="ain__hero-latency">
-              <strong>{data.probedCount}</strong> of {total} services carry a
-              measured latency · <strong>{data.submillisecondCount}</strong>{" "}
-              meet the sub-millisecond goal on loopback · the rest measured by
-              cold MCP / CLI control-surface invocation.
+              <strong>{data.probedCount}</strong> of {total} services carry a measured latency ·{" "}
+              <strong>{data.submillisecondCount}</strong> meet the sub-millisecond goal on loopback
+              · the rest measured by cold MCP / CLI control-surface invocation.
             </p>
           </div>
         </div>
         <p className="ain__hero-axes">
-          Each app is gauged on two axes — <strong>capability</strong> (can an
-          agent discover, drive, and reason about it: agent docs, a CLI, an MCP
-          server, a JSON API, agent integration) and <strong>latency</strong>{" "}
-          (how fast it answers, against a sub-millisecond goal).
+          Each app is gauged on two axes — <strong>capability</strong> (can an agent discover,
+          drive, and reason about it: agent docs, a CLI, an MCP server, a JSON API, agent
+          integration) and <strong>latency</strong> (how fast it answers, against a sub-millisecond
+          goal).
         </p>
         <div className="ain__hero-controls">
           <label className="ain__sort">
             Sort
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortMode)}
-            >
+            <select value={sort} onChange={(e) => setSort(e.target.value as SortMode)}>
               <option value="tier-asc">Opaque first</option>
               <option value="tier-desc">AI-Native first</option>
               <option value="score-desc">Highest score</option>
@@ -493,9 +463,7 @@ export function AiNativeView({ client }: Props) {
               key={report.slug}
               report={report}
               expanded={isExpanded}
-              onToggle={() =>
-                setExpandedSlug(isExpanded ? null : report.slug)
-              }
+              onToggle={() => setExpandedSlug(isExpanded ? null : report.slug)}
             />
           );
         })}

@@ -376,10 +376,7 @@ describe("buildTestMatrix — per-kind sentinel folding", () => {
     const recent = Date.now() - 60 * 1000;
     const m = buildTestMatrix(
       card(["test", "test:e2e"]),
-      healthWithKinds(
-        { e2e: { at: recent, ok: true } },
-        { lastTestAt: recent, lastTestOk: true },
-      ),
+      healthWithKinds({ e2e: { at: recent, ok: true } }, { lastTestAt: recent, lastTestOk: true }),
     );
     const e2e = m.categories
       .find((c) => c.category === "functional")

@@ -1,6 +1,6 @@
 {
   "name": "sigmashake-workspace",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "private": true,
   "bin": {
@@ -12,7 +12,6 @@
     "predeploy": "bun run generate",
     "dev": "wrangler dev",
     "build:client": "bun run generate && vite build && bun run scripts/strip-index-html.ts",
-    "build:electrobun": "bun run generate && vite build --config vite.electrobun.config.ts",
     "build:vscode": "bun run generate && vite build --config vite.vscode.config.ts",
     "build:plugin": "bun run generate && bun run scripts/build-plugin.ts",
     "package:vscode": "bun run build:vscode && cd vscode && pnpm install --silent --prefer-offline && pnpm dlx @vscode/vsce package --no-dependencies --out .",
@@ -33,7 +32,7 @@
     "test:scalability": "vitest run --project perf test/scalability",
     "test:api": "vitest run --project integration",
     "test:dependencies": "bun audit --audit-level=high",
-    "build": "bun run build:client && bun run build:electrobun && bun run build:vscode && bun run build:plugin",
+    "build": "bun run build:client && bun run build:vscode && bun run build:plugin",
     "clean": "bun run scripts/clean.ts",
     "lint": "biome check .",
     "fix": "biome check --write .",

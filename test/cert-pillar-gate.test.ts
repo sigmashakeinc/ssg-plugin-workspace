@@ -47,18 +47,9 @@ interface ReportOverride {
 function makeReport(over: ReportOverride = {}): CertReport {
   const tests = over.tests ?? {};
   const dimensions: CertDimension[] = over.dimensions ?? [
-    dim("source", 100, [
-      signal("git_clean", "ok"),
-      signal("git_sync", "ok"),
-    ]),
-    dim("format", 100, [
-      signal("format_configured", "ok"),
-      signal("format_clean", "ok"),
-    ]),
-    dim("lint", 100, [
-      signal("lint_configured", "ok"),
-      signal("lint_clean", "ok"),
-    ]),
+    dim("source", 100, [signal("git_clean", "ok"), signal("git_sync", "ok")]),
+    dim("format", 100, [signal("format_configured", "ok"), signal("format_clean", "ok")]),
+    dim("lint", 100, [signal("lint_configured", "ok"), signal("lint_clean", "ok")]),
     dim("types", 100, [
       signal("types_configured", "ok"),
       signal("types_clean", over.typesClean ?? "ok"),
@@ -80,10 +71,7 @@ function makeReport(over: ReportOverride = {}): CertReport {
       signal("security_mitre_d3fend", "ok"),
       signal("security_framework_review", "ok"),
     ]),
-    dim("build", 100, [
-      signal("build_configured", "ok"),
-      signal("build_fresh", "ok"),
-    ]),
+    dim("build", 100, [signal("build_configured", "ok"), signal("build_fresh", "ok")]),
     dim("deploy", 100, [
       signal("deploy_gate", "ok", "Deploy gate", "worker — gate cleared"),
       signal("deploy_recent", "ok"),
@@ -133,18 +121,14 @@ describe("buildTestsPillar — tightened tests_clean gate", () => {
   });
 
   it("still gates on the configured signal (required)", () => {
-    const pillar = buildTestsPillar(
-      makeReport({ tests: { clean: "ok", configured: "missing" } }),
-    );
+    const pillar = buildTestsPillar(makeReport({ tests: { clean: "ok", configured: "missing" } }));
     expect(pillar.pass).toBe(false);
   });
 
   it("forgives the optional taxonomy signal when only it is degraded", () => {
     // taxonomy is `required: false` in the pillar builder, so a warn/fail
     // there shouldn't sink the pillar provided the required pieces are ok.
-    const pillar = buildTestsPillar(
-      makeReport({ tests: { clean: "ok", taxonomy: "warn" } }),
-    );
+    const pillar = buildTestsPillar(makeReport({ tests: { clean: "ok", taxonomy: "warn" } }));
     expect(pillar.pass).toBe(true);
   });
 
@@ -235,18 +219,14 @@ describe("computePillars + tierFromPillars — end-to-end demotion", () => {
     // The headline scenario: every other dimension is perfect, but the test
     // sentinel is unknown. Pre-change this was gold; post-change it must be
     // silver (3 pillars passing).
-    const pillars = computePillars(
-      makeReport({ tests: { clean: "unknown" }, testsScore: 83 }),
-    );
+    const pillars = computePillars(makeReport({ tests: { clean: "unknown" }, testsScore: 83 }));
     const passing = pillars.filter((p) => p.pass).length;
     expect(passing).toBe(3);
     expect(tierFromPillars(passing)).toBe("silver");
   });
 
   it("tests_clean=fail also lands at silver (3 pillars)", () => {
-    const pillars = computePillars(
-      makeReport({ tests: { clean: "fail" }, testsScore: 67 }),
-    );
+    const pillars = computePillars(makeReport({ tests: { clean: "fail" }, testsScore: 67 }));
     expect(tierFromPillars(pillars.filter((p) => p.pass).length)).toBe("silver");
   });
 });

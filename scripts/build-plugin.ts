@@ -7,9 +7,9 @@
 //       vite emits absolute paths despite base:"./".
 // 3. Reports dist-plugin/ contents + SHA-256 of app.js.
 
-import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
@@ -63,9 +63,7 @@ if (!existsSync(appJsPath)) {
   process.exit(1);
 }
 
-const sha256 = createHash("sha256")
-  .update(readFileSync(appJsPath))
-  .digest("hex");
+const sha256 = createHash("sha256").update(readFileSync(appJsPath)).digest("hex");
 
 console.log("\ndist-plugin/ contents:");
 for (const f of readdirSync(distDir)) {

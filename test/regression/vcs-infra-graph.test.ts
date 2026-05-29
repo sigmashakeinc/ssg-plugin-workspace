@@ -61,13 +61,15 @@ describe("sigmashake-vcs in the infrastructure graph", () => {
     expect(kvEdge, "SESSIONS KV binding edge missing").toBeDefined();
   });
 
-  it("binds both production secrets (ENCRYPTION_KEY + VCS_HMAC_KEY)", () => {
-    const secretEdges = edgesFromWorker.filter(
-      (e) => e.kind === "binding" && e.to.startsWith("secret:"),
+  it("reads production secrets via the sigmashake-vault service binding", () => {
+    // sigmashake-vcs migrated off direct [[secrets_store_secrets]] bindings to
+    // a runtime vault read via the VAULT service binding (ENCRYPTION_KEY and
+    // VCS_HMAC_KEY are fetched from sigmashake-vault on first use). The infra
+    // graph emits this as a `service` edge.
+    const vaultEdge = edgesFromWorker.find(
+      (e) => e.kind === "service" && e.to === "worker:sigmashake-vault",
     );
-    const secretTargets = secretEdges.map((e) => e.to);
-    expect(secretTargets).toContain("secret:ENCRYPTION_KEY__prod");
-    expect(secretTargets).toContain("secret:VCS_HMAC_KEY__prod");
+    expect(vaultEdge, "VAULT service binding to sigmashake-vault is missing").toBeDefined();
   });
 
   it("forwards tail events to sigmashake-alerts", () => {

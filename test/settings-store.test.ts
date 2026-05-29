@@ -66,6 +66,30 @@ describe("normalizeSettings", () => {
   it("rejects non-number updatedAt", () => {
     expect(normalizeSettings({ updatedAt: "now" as unknown as number }).updatedAt).toBe(0);
   });
+
+  it("defaults lineOverrides to an empty object", () => {
+    expect(normalizeSettings({ mode: "stack" }).lineOverrides).toEqual({});
+  });
+
+  it("keeps valid lineOverrides and drops malformed entries", () => {
+    const result = normalizeSettings({
+      lineOverrides: {
+        "sigmashake-obs": "non-production",
+        "sigmashake-gov": "production",
+        "sigmashake-bad": "sideways", // invalid line value → dropped
+        "Bad Slug!": "production", // invalid slug key → dropped
+      },
+    });
+    expect(result.lineOverrides).toEqual({
+      "sigmashake-obs": "non-production",
+      "sigmashake-gov": "production",
+    });
+  });
+
+  it("coerces a non-object lineOverrides to {}", () => {
+    expect(normalizeSettings({ lineOverrides: "nope" }).lineOverrides).toEqual({});
+    expect(normalizeSettings({ lineOverrides: 42 }).lineOverrides).toEqual({});
+  });
 });
 
 describe("readLocalSettings + writeLocalSettings", () => {
@@ -75,6 +99,7 @@ describe("readLocalSettings + writeLocalSettings", () => {
       mode: "services",
       onboarded: true,
       fleetOrgSlug: "acme-corp",
+      lineOverrides: { "sigmashake-obs": "non-production" },
       updatedAt: 12345,
     });
     expect(readLocalSettings()).toEqual({
@@ -82,6 +107,7 @@ describe("readLocalSettings + writeLocalSettings", () => {
       mode: "services",
       onboarded: true,
       fleetOrgSlug: "acme-corp",
+      lineOverrides: { "sigmashake-obs": "non-production" },
       updatedAt: 12345,
     });
   });

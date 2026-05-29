@@ -2,10 +2,10 @@
 //
 // Registers a single command that opens a webview panel hosting the
 // workspace React bundle (built into webview-dist/ by `bun run build:vscode`).
-// The bundle is the same React app that ships to cloud / local-web /
-// electrobun, with WORKSPACE_RUNTIME = "vscode" — its client (src/client/api/
-// vscode.ts) sends fetch requests over postMessage; this host proxies them to
-// the user-configured SSG daemon URL.
+// The bundle is the same React app that ships to cloud / local-web / plugin,
+// with WORKSPACE_RUNTIME = "vscode" — its client (src/client/api/vscode.ts)
+// sends fetch requests over postMessage; this host proxies them to the
+// user-configured SSG daemon URL.
 //
 // We deliberately keep the proxy surface minimal: the webview cannot reach
 // arbitrary URLs through the host. Only requests whose URL starts with the
@@ -172,10 +172,7 @@ function sanitizeDaemonUrl(raw: string): string {
   }
   const host = parsed.hostname.toLowerCase();
   const isLoopback =
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "::1" ||
-    host === "[::1]";
+    host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
   const isSigmashake = host === "sigmashake.com" || host.endsWith(".sigmashake.com");
   if (!isLoopback && !isSigmashake) {
     void vscode.window.showWarningMessage(

@@ -8,7 +8,7 @@
 // Data sources, all read in parallel on mount:
 //   - ProjectCard[] (already in the parent)
 //   - getHealth(allSlugs) → per-project git/deploy/build/test sentinels
-//   - getDistribution() → cross-channel release status. Local/electrobun only.
+//   - getDistribution() → cross-channel release status. Local/plugin only.
 //   - getFleetStatus() → reachability + enrollment (cheap public probe)
 //
 // Anything missing fails open: a stat that can't load shows "n/a", the rest

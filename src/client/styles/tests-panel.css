@@ -8,6 +8,28 @@
   }
 }
 
+/* "Run all tests" affordance in the coverage overview header */
+.tests__overview-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.tests__runall-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tests__runall-progress-text {
+  font-size: 11.5px;
+  color: var(--ss-brand);
+  font-family: var(--ss-font-mono);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
 /* Inline run status shown next to the Run button */
 .tests__run-status {
   display: inline-flex;

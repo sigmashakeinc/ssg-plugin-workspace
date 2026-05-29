@@ -1,0 +1,26 @@
+# sigmashake-workspace — On-call rotation
+#
+# Single-operator model today. The on-call's responsibilities:
+#   - Acknowledge a P1 page within 10 minutes (24/7)
+#   - Acknowledge a P2 ticket within 4 business hours
+#   - Drive any incident through to a written postmortem within 5 business days
+#   - Apply the deploy-freeze rules in docs/error-budget.md when burn rates page
+
+[meta]
+service = "sigmashake-workspace"
+last_reviewed = "2026-05-27"
+rotation_kind = "single-operator"
+
+[rotation]
+members = ["super@sigmashake.com"]
+escalation = "self"
+pager_webhook_secret = "PAGERDUTY_SIGMASHAKE_WORKSPACE_WEBHOOK"
+chat_channel_webhook_secret = "SLACK_SIGMASHAKE_WORKSPACE_CHANNEL_WEBHOOK"
+
+[handoff]
+schedule_local = "Monday 08:00 PT"
+duration_minutes = 15
+
+[external_dependencies]
+cloudflare = "https://www.cloudflarestatus.com"
+github = "https://www.githubstatus.com"

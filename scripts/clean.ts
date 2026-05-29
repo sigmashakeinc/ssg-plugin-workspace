@@ -9,7 +9,7 @@ const ROOT = resolve(import.meta.dir, "..");
 const TARGETS = [
   "public/assets",
   "dist-local",
-  "dist-electrobun",
+  "dist-plugin",
   ".wrangler",
   "vscode/webview-dist",
   "vscode/out",

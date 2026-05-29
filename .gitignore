@@ -2,6 +2,7 @@ node_modules/
 .wrangler/
 dist-local/
 dist-plugin/
+dist/
 public/assets/
 public/index.html
 src/registry.generated.ts

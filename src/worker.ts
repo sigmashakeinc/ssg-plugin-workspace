@@ -13,6 +13,7 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 
+import { buildDistributionDrift, type DistributionDrift } from "./distribution-drift";
 import { PLATFORM_PARITY_CATALOG } from "./platform-parity-catalog";
 import { READINESS_REPORT } from "./readiness.generated";
 import { PROJECTS_REGISTRY } from "./registry.generated";
@@ -108,14 +109,50 @@ function loginRedirect(requestUrl: string): Response {
 // Anything inside this allowlist bypasses the auth gate. Keep it minimal —
 // only health probes that need to work without a cookie. Even the SPA bundle
 // requires auth so an unauthenticated visitor never sees app.js / app.css.
-const PUBLIC_PATHS = new Set<string>(["/healthz"]);
+// The install scripts are public because they contain only the FETCH logic,
+// not the actual secret — the vault still enforces gh-auth + allowlist when
+// the script runs.
+const PUBLIC_PATHS = new Set<string>([
+  "/healthz",
+  "/install-parity-token.sh",
+  "/install-parity-token.ps1",
+  // Cross-channel release-parity probe. Surfaces are public CDN data
+  // (download.sigmashake.com update.json + github.com release tags) — no
+  // operator state. Public so the local + plugin + vscode SPA runtimes can
+  // proxy through this endpoint without a session cookie, and so the nightly
+  // drift cron can hit it from a separate Worker.
+  "/api/workspace/distribution-drift",
+]);
+
+// Routes the SSG daemon hits with the PARITY_AGENT_TOKEN bearer instead of
+// the operator session cookie (the daemon is a headless process and has no
+// way to obtain a session). Operator-session reads still work — the bearer
+// check just provides an alternate path when no cookie is present.
+const PARITY_AGENT_PATHS = new Set<string>(["/api/workspace/parity-matrix"]);
+
+function readBearer(c: { req: { header: (name: string) => string | undefined } }): string | null {
+  const raw = c.req.header("Authorization") ?? "";
+  const m = raw.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
 
 app.use("*", async (c, next) => {
   if (PUBLIC_PATHS.has(c.req.path)) {
     return next();
   }
 
+  // Bearer-token bypass for the daemon write-through path. Constant-time-ish
+  // string compare is fine here — both sides are 64-hex tokens of equal length,
+  // and v8's === on equal-length strings doesn't early-exit on mismatch.
   const sessionId = getCookie(c, COOKIE_NAME);
+  if (!sessionId && PARITY_AGENT_PATHS.has(c.req.path) && c.env.PARITY_AGENT_TOKEN) {
+    const bearer = readBearer(c);
+    if (bearer && bearer === c.env.PARITY_AGENT_TOKEN) {
+      // No session — these routes' handlers must not depend on c.get('session').
+      return next();
+    }
+  }
+
   const session = sessionId ? await lookupOperatorSession(c.env, sessionId) : null;
 
   if (session) {
@@ -137,6 +174,119 @@ app.use("*", async (c, next) => {
 });
 
 app.get("/healthz", (c) => c.text("ok", 200, { "Cache-Control": "no-store" }));
+
+// ── Install scripts for ~/.sigmashake/workspace-parity-token ─────────────────
+// One-liner bootstrap that pulls WORKSPACE_PARITY_TOKEN from vault.sigmashake.com
+// (which gates on `gh auth token` + ALLOWED_GITHUB_USER_IDS) and writes it to
+// the local file the SSG daemon reads on attest/probe. Public route because
+// it contains only the fetch logic — the secret is still gated by the vault.
+//
+// Operator usage:
+//   macOS / Linux / WSL / Git-Bash:
+//     curl -fsSL https://workspace.sigmashake.com/install-parity-token.sh | bash
+//   Windows PowerShell:
+//     iwr https://workspace.sigmashake.com/install-parity-token.ps1 | iex
+
+const INSTALL_PARITY_TOKEN_SH = `#!/usr/bin/env bash
+set -euo pipefail
+
+# install-parity-token.sh — fetch WORKSPACE_PARITY_TOKEN from vault.sigmashake.com
+# and write it to ~/.sigmashake/workspace-parity-token (mode 0600). Re-run any
+# time to refresh.
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "✗ 'gh' (GitHub CLI) is required — install from https://cli.github.com/" >&2
+  exit 1
+fi
+if ! command -v curl >/dev/null 2>&1; then
+  echo "✗ 'curl' is required" >&2
+  exit 1
+fi
+
+GH_TOKEN="$(gh auth token 2>/dev/null || true)"
+if [ -z "$GH_TOKEN" ]; then
+  echo "✗ no gh token — run 'gh auth login' first" >&2
+  exit 1
+fi
+
+mkdir -p "$HOME/.sigmashake"
+TARGET="$HOME/.sigmashake/workspace-parity-token"
+
+RESP="$(curl -fsS \\
+  -H "Authorization: GitHub $GH_TOKEN" \\
+  https://vault.sigmashake.com/v1/secrets/WORKSPACE_PARITY_TOKEN)"
+
+VALUE="$(printf '%s' "$RESP" | sed -n 's/.*"value":"\\([^"]*\\)".*/\\1/p')"
+if [ -z "$VALUE" ]; then
+  echo "✗ vault response missing value field — got: $RESP" >&2
+  exit 1
+fi
+
+umask 077
+printf '%s' "$VALUE" > "$TARGET"
+chmod 600 "$TARGET"
+echo "✓ wrote $TARGET (\${#VALUE} bytes)"
+echo "  daemon picks this up on next attest/probe — no restart needed"
+`;
+
+const INSTALL_PARITY_TOKEN_PS1 = `# install-parity-token.ps1 — fetch WORKSPACE_PARITY_TOKEN from vault.sigmashake.com
+# and write it to %USERPROFILE%\\.sigmashake\\workspace-parity-token. Re-run any
+# time to refresh.
+$ErrorActionPreference = "Stop"
+
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+  Write-Error "'gh' (GitHub CLI) is required — install from https://cli.github.com/"
+  exit 1
+}
+
+$ghToken = (gh auth token 2>$null)
+if ([string]::IsNullOrWhiteSpace($ghToken)) {
+  Write-Error "no gh token — run 'gh auth login' first"
+  exit 1
+}
+
+$dir = Join-Path $HOME ".sigmashake"
+if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+$target = Join-Path $dir "workspace-parity-token"
+
+$resp = Invoke-RestMethod -Method Get \`
+  -Headers @{ "Authorization" = "GitHub $ghToken" } \`
+  -Uri "https://vault.sigmashake.com/v1/secrets/WORKSPACE_PARITY_TOKEN"
+
+if (-not $resp.value) {
+  Write-Error "vault response missing value field"
+  exit 1
+}
+
+# Write without trailing newline so byte length is exactly the token length.
+[System.IO.File]::WriteAllText($target, $resp.value)
+
+# Lock down ACLs — owner only, mirroring chmod 600.
+$acl = Get-Acl $target
+$acl.SetAccessRuleProtection($true, $false)
+$acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) | Out-Null }
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule(\`
+  [System.Security.Principal.WindowsIdentity]::GetCurrent().User, "FullControl", "Allow")
+$acl.AddAccessRule($rule)
+Set-Acl -Path $target -AclObject $acl
+
+Write-Host "✓ wrote $target ($($resp.value.Length) bytes)"
+Write-Host "  daemon picks this up on next attest/probe — no restart needed"
+`;
+
+app.get("/install-parity-token.sh", (c) =>
+  c.text(INSTALL_PARITY_TOKEN_SH, 200, {
+    "Content-Type": "text/x-shellscript; charset=utf-8",
+    "Cache-Control": "private, max-age=60",
+  }),
+);
+
+app.get("/install-parity-token.ps1", (c) =>
+  c.text(INSTALL_PARITY_TOKEN_PS1, 200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "private, max-age=60",
+  }),
+);
 
 app.get("/api/session/me", (c) => {
   return c.json(c.get("session"), 200, { "Cache-Control": "no-store" });
@@ -182,7 +332,7 @@ app.get("/api/workspace/projects", (c) => {
 app.get("/api/workspace/infrastructure", (c) => {
   // The infrastructure graph names every internal worker + binding id; the
   // cloud surface deliberately doesn't serve it even to authenticated
-  // operators. Local + electrobun runtimes scan wrangler.toml live through
+  // operators. Local + plugin runtimes scan wrangler.toml live through
   // the SSG daemon and never hit this endpoint.
   return c.json(
     {
@@ -253,13 +403,74 @@ app.get("/api/workspace/ai-native", (c) => {
   );
 });
 
-app.get("/api/workspace/platform-parity", (c) => {
-  // Cloud surface ships the static catalog so the matrix can render even
-  // without a daemon. Every cell is `unknown` with evidence pointing at
-  // SigmaShake Desktop — auto-probes can only run on the operator's machine
-  // and manual attestations need the desktop UI's recording form.
-  return c.json(buildCloudPlatformParitySnapshot(), 200, {
-    "Cache-Control": "private, max-age=60",
+app.get("/api/workspace/platform-parity", async (c) => {
+  // Cloud surface starts from the static catalog (so the matrix can render
+  // even without a daemon), then merges live cells from PARITY_MATRIX KV that
+  // each operator host's daemon writes on attest/probe. The result: a true
+  // cross-OS matrix visible from any operator browser, even when the Linux
+  // host is offline. Falls through to the catalog-only snapshot if PARITY_
+  // MATRIX is unbound (local `wrangler dev` without the namespace).
+  const snapshot = buildCloudPlatformParitySnapshot();
+  if (c.env.PARITY_MATRIX) {
+    await mergeCloudParityMatrix(snapshot, c.env.PARITY_MATRIX);
+  }
+  return c.json(snapshot, 200, { "Cache-Control": "private, max-age=15" });
+});
+
+// Daemon write-through endpoint. Each SSG daemon POSTs every changed cell
+// here after persisting locally (workspace-platform-parity.ts → cloud-parity-
+// sync.ts). Bearer-gated via PARITY_AGENT_TOKEN — the auth middleware lets the
+// request through without a session when the bearer matches. Body shape mirrors
+// the daemon's PlatformParityResult exactly so the KV blob round-trips
+// untouched between hosts.
+app.post("/api/workspace/parity-matrix", async (c) => {
+  if (!c.env.PARITY_MATRIX) {
+    return c.json(
+      { error: "unconfigured", message: "PARITY_MATRIX KV binding is not set on this Worker." },
+      503,
+    );
+  }
+  let body: ParityMatrixWriteBody;
+  try {
+    body = (await c.req.json()) as ParityMatrixWriteBody;
+  } catch {
+    return c.json({ error: "invalid_json" }, 400);
+  }
+  const cells = Array.isArray(body?.cells) ? body.cells : [];
+  if (cells.length === 0) {
+    return c.json({ error: "no_cells" }, 400);
+  }
+  let written = 0;
+  for (const cell of cells) {
+    if (!cell || typeof cell !== "object") continue;
+    const { featureId, os, result } = cell;
+    if (typeof featureId !== "string" || !featureId) continue;
+    if (os !== "linux" && os !== "darwin" && os !== "win32") continue;
+    if (!result || typeof result !== "object") continue;
+    // KV value is the persisted PlatformParityResult JSON — same shape the
+    // daemon writes locally to ~/.sigmashake/platform-parity.json. We don't
+    // re-validate field-by-field because the daemon is the trusted source
+    // (bearer-authenticated); a malformed cell would just render as broken
+    // in the UI, not security-impactful.
+    await c.env.PARITY_MATRIX.put(`cell:${featureId}:${os}`, JSON.stringify(result));
+    written += 1;
+  }
+  return c.json({ ok: true, written }, 200);
+});
+
+app.get("/api/workspace/parity-matrix", async (c) => {
+  // Raw KV dump for the daemon's snapshot-merge path. The browser-facing
+  // /platform-parity endpoint above already merges, so the SPA doesn't need
+  // this — it's here so each daemon can pull sibling OS columns at read time.
+  if (!c.env.PARITY_MATRIX) {
+    return c.json(
+      { error: "unconfigured", message: "PARITY_MATRIX KV binding is not set on this Worker." },
+      503,
+    );
+  }
+  const matrix = await loadParityMatrix(c.env.PARITY_MATRIX);
+  return c.json({ generatedAt: Date.now(), cells: matrix }, 200, {
+    "Cache-Control": "no-store",
   });
 });
 
@@ -269,11 +480,9 @@ app.get("/api/workspace/readiness", (c) => {
   // tree — they ship as "unknown" with evidence pointing at SigmaShake Desktop
   // for live data. `generatedAt` is overwritten so the response carries the
   // current request time, not the build time.
-  return c.json(
-    { ...READINESS_REPORT, generatedAt: Date.now() },
-    200,
-    { "Cache-Control": "private, max-age=60" },
-  );
+  return c.json({ ...READINESS_REPORT, generatedAt: Date.now() }, 200, {
+    "Cache-Control": "private, max-age=60",
+  });
 });
 
 app.get("/api/workspace/readiness/text", (c) => {
@@ -310,9 +519,31 @@ app.get("/api/workspace/inbox", async (c) => {
   return c.json(snapshot, 200, { "Cache-Control": "no-store" });
 });
 
+// ── Distribution drift: cross-channel parity report for SigmaShake Desktop ──
+// Polls R2 update.json + blob HEAD + GitHub latest release to detect lanes
+// that are behind, broken, or missing assets. Surfaces the situation that
+// stranded arm64 at 0.1.98 for days while x64 shipped 0.1.99. Cached 60s —
+// drift moves on the order of minutes, not seconds. Cloud-only path because
+// the CDN + GitHub API block cross-origin browser fetches; the workspace
+// SPA in any runtime calls this endpoint on the cloud host. CORS open so
+// the local / plugin / vscode runtimes can read it cross-origin.
+app.get("/api/workspace/distribution-drift", async (c) => {
+  // No KV cache — Cloudflare's edge cache honors the 60s max-age below, and
+  // the upstream probes total ~5 reads in parallel (sub-100ms typical with
+  // the R2 binding). Drift moves on minute timescales so 60s freshness is
+  // fine. DOWNLOADS R2 binding is required: same-zone HTTPS fetches to
+  // download.sigmashake.com get dropped with HTTP 522 because both Workers
+  // live on the sigmashake.com zone.
+  const snapshot: DistributionDrift = await buildDistributionDrift(fetch, c.env.DOWNLOADS ?? null);
+  return c.json(snapshot, 200, {
+    "Cache-Control": "public, max-age=60",
+    "Access-Control-Allow-Origin": "*",
+  });
+});
+
 // ── Observability: consolidated service-health board ─────────────────────────
 // Proxies to sigmashake-observ over the OBSERV service binding. Cloud-only,
-// like the Inbox: the binding lives on this Worker, so local + electrobun +
+// like the Inbox: the binding lives on this Worker, so local + plugin +
 // vscode runtimes render an "open in cloud" CTA instead of fetching. The
 // upstream response passes through verbatim — status code and JSON body.
 app.get("/api/workspace/observability", async (c) => {
@@ -710,9 +941,7 @@ const READINESS_STATUS_SIGIL: Record<string, string> = {
   unknown: "UNKNOWN",
 };
 
-function renderReadinessText(
-  resp: import("./types").ReadinessResponse,
-): string {
+function renderReadinessText(resp: import("./types").ReadinessResponse): string {
   const lines: string[] = [];
   lines.push("# SigmaShake production readiness");
   if (resp.manifestError) {
@@ -839,6 +1068,134 @@ function buildCloudPlatformParitySnapshot(): PlatformParityResponse {
     storeError:
       "cloud surface — live per-OS results need SigmaShake Desktop on the operator's machine",
   };
+}
+
+// ── Cross-OS parity matrix (KV-backed) ───────────────────────────────────────
+//
+// Storage shape: `cell:<feature_id>:<os>` → JSON PlatformParityResult (the same
+// blob the daemon writes locally to ~/.sigmashake/platform-parity.json under
+// .results[feature_id][os]). Last-write-wins per cell — if two hosts on the
+// same OS attest the same feature, the later one overwrites; both hostIds are
+// preserved in `hostsSeen` on the daemon side so the UI can show "attested by
+// pop-os (user) · linux 6.18.7" even after a re-write.
+
+type ParityOs = "linux" | "darwin" | "win32";
+type ParityStatus = "pass" | "fail" | "partial" | "skipped" | "unknown" | "not-applicable";
+type ParityAttestation = "auto" | "manual";
+
+interface ParityResultBlob {
+  status: ParityStatus;
+  attestation: ParityAttestation;
+  lastCheckedAt: number;
+  durationMs: number | null;
+  evidence: string;
+  error: string | null;
+  hostId: string;
+  hostLabel: string;
+}
+
+interface ParityMatrixWriteBody {
+  cells: Array<{
+    featureId: string;
+    os: ParityOs;
+    result: ParityResultBlob;
+  }>;
+}
+
+type ParityMatrix = Record<string, Partial<Record<ParityOs, ParityResultBlob>>>;
+
+async function loadParityMatrix(kv: KVNamespace): Promise<ParityMatrix> {
+  // KV list() is paginated by 1000-key chunks; we never expect more than
+  // ~150 cells (50 features × 3 OSes) so a single page is plenty, but we still
+  // loop on cursor for safety.
+  const out: ParityMatrix = {};
+  let cursor: string | undefined;
+  for (let i = 0; i < 8; i++) {
+    const page = await kv.list({ prefix: "cell:", cursor, limit: 1000 });
+    await Promise.all(
+      page.keys.map(async (k) => {
+        // Key shape: cell:<feature_id>:<os>. Feature ids contain hyphens but
+        // no colons, so split on the FIRST and LAST colon and trust the middle.
+        const rest = k.name.slice("cell:".length);
+        const lastColon = rest.lastIndexOf(":");
+        if (lastColon < 0) return;
+        const featureId = rest.slice(0, lastColon);
+        const os = rest.slice(lastColon + 1) as ParityOs;
+        if (os !== "linux" && os !== "darwin" && os !== "win32") return;
+        const blob = await kv.get<ParityResultBlob>(k.name, "json").catch(() => null);
+        if (!blob) return;
+        if (!out[featureId]) out[featureId] = {};
+        out[featureId][os] = blob;
+      }),
+    );
+    if (page.list_complete || !page.cursor) break;
+    cursor = page.cursor;
+  }
+  return out;
+}
+
+async function mergeCloudParityMatrix(
+  snapshot: PlatformParityResponse,
+  kv: KVNamespace,
+): Promise<void> {
+  const matrix = await loadParityMatrix(kv);
+  let merged = 0;
+  for (const f of snapshot.features) {
+    const row = matrix[f.id];
+    if (!row) continue;
+    for (const os of ["linux", "darwin", "win32"] as const) {
+      const cell = row[os];
+      if (!cell) continue;
+      // Don't override not-applicable cells (catalog scoped to a specific OS).
+      const current = f.results[os];
+      if (current && current.status === "not-applicable") continue;
+      f.results[os] = cell;
+      merged += 1;
+    }
+  }
+  // Recompute the summary now that real cells have replaced the unknowns.
+  if (merged > 0) {
+    let pass = 0,
+      fail = 0,
+      partial = 0,
+      unknown = 0,
+      skipped = 0,
+      notApplicable = 0;
+    let scoreNum = 0,
+      scoreDen = 0,
+      blockingGaps = 0;
+    for (const f of snapshot.features) {
+      let blockingClean = true;
+      for (const cell of [f.results.linux, f.results.darwin, f.results.win32]) {
+        const status = cell?.status ?? "unknown";
+        if (status === "pass") pass += 1;
+        else if (status === "fail") fail += 1;
+        else if (status === "partial") partial += 1;
+        else if (status === "skipped") skipped += 1;
+        else if (status === "not-applicable") notApplicable += 1;
+        else unknown += 1;
+        if (status === "not-applicable") continue;
+        const weight = f.severity === "blocking" ? 2 : 1;
+        scoreDen += weight;
+        if (status === "pass") scoreNum += weight;
+        else if (status === "partial" || status === "skipped") scoreNum += weight * 0.5;
+        if (status !== "pass") blockingClean = false;
+      }
+      if (f.severity === "blocking" && !blockingClean) blockingGaps += 1;
+    }
+    snapshot.summary = {
+      total: snapshot.features.length,
+      pass,
+      fail,
+      partial,
+      unknown,
+      skipped,
+      notApplicable,
+      parityScore: scoreDen === 0 ? 0 : Math.round((scoreNum * 100) / scoreDen),
+      blockingGaps,
+    };
+    snapshot.storeError = null;
+  }
 }
 
 // SPA shell — strip-index-html.ts removes Vite's default index.html so this

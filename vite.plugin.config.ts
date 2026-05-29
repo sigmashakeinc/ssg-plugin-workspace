@@ -1,7 +1,7 @@
 // Plugin build — single-file bundle mounted at /plugins/workspace/ inside the
 // SSG daemon plugin shell. base:'./' ensures all emitted asset URLs are relative
 // so they resolve correctly under the plugin sub-path. inlineDynamicImports
-// avoids dynamic chunk URL issues (same reason local/electrobun/vscode use this).
+// avoids dynamic chunk URL issues (same reason local/vscode use this).
 
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";

@@ -50,11 +50,21 @@ interface RunState {
   startedAt: number;
 }
 
+/** Progress of a "Run all tests" sweep across every configured suite. */
+interface RunAllState {
+  total: number;
+  /** 1-based index of the suite currently running. */
+  current: number;
+  /** Human label of the suite currently running. */
+  label: string;
+}
+
 export function TestsPanel({ card, client }: Props) {
   const [health, setHealth] = useState<HealthSummary | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [runState, setRunState] = useState<RunState | null>(null);
+  const [runAll, setRunAll] = useState<RunAllState | null>(null);
   const [kindHistory, setKindHistory] = useState<KindHistoryMap>({});
   const [reports, setReports] = useState<ReportMap>({});
   // Per-kind recorded run history (daemon `.test-history-<kind>.jsonl`) — the
@@ -63,6 +73,9 @@ export function TestsPanel({ card, client }: Props) {
   const [trend, setTrend] = useState<TrendMap>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const cancelRef = useRef<(() => Promise<void>) | null>(null);
+  // Cancellation token for an in-flight "Run all" sweep; `.cancelled` is flipped
+  // by stopRun so the sequential loop bails before kicking off the next suite.
+  const runAllRef = useRef<{ cancelled: boolean } | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
 
   // Re-fetch the health sentinel whenever the project changes or we just
@@ -219,7 +232,47 @@ export function TestsPanel({ card, client }: Props) {
     [card.slug, client, refreshHealth, refreshReports],
   );
 
+  // Every configured (runnable) suite across all categories, in catalog order,
+  // deduped by script — the work list for "Run all tests".
+  const runnableKinds = useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{ kindId: string; script: string; label: string }> = [];
+    for (const cat of matrix.categories) {
+      const def = TEST_CATALOG.find((c) => c.id === cat.category);
+      for (const r of cat.results) {
+        if (!r.script || seen.has(r.script)) continue;
+        seen.add(r.script);
+        const label = def?.kinds.find((k) => k.id === r.kindId)?.label ?? r.kindId;
+        out.push({ kindId: r.kindId, script: r.script, label });
+      }
+    }
+    return out;
+  }, [matrix]);
+
+  const runAllTests = useCallback(async () => {
+    if (runnableKinds.length === 0 || runAllRef.current) return;
+    // PSU safety (see CLAUDE.md): this workstation hard-resets on concurrent
+    // CPU+GPU power co-spikes, so suites MUST run strictly one-at-a-time. Do
+    // NOT parallelize this loop — each `await runKind` fully completes (or is
+    // cancelled) before the next suite starts.
+    const token = { cancelled: false };
+    runAllRef.current = token;
+    try {
+      for (let i = 0; i < runnableKinds.length; i++) {
+        if (token.cancelled) break;
+        const { kindId, script, label } = runnableKinds[i];
+        setRunAll({ total: runnableKinds.length, current: i + 1, label });
+        await runKind(kindId, script);
+      }
+    } finally {
+      runAllRef.current = null;
+      setRunAll(null);
+    }
+  }, [runnableKinds, runKind]);
+
   const stopRun = useCallback(async () => {
+    // Halt the whole "Run all" sweep, not just the current suite.
+    if (runAllRef.current) runAllRef.current.cancelled = true;
     if (cancelRef.current) {
       await cancelRef.current();
       cancelRef.current = null;
@@ -228,7 +281,16 @@ export function TestsPanel({ card, client }: Props) {
 
   return (
     <div className="panel tests">
-      <TestsHeader matrix={matrix} reports={reports} loading={healthLoading} />
+      <TestsHeader
+        matrix={matrix}
+        reports={reports}
+        loading={healthLoading}
+        runnableCount={runnableKinds.length}
+        runAll={runAll}
+        anyRunning={Boolean(runState && !runState.done)}
+        onRunAll={runAllTests}
+        onStopAll={stopRun}
+      />
 
       {healthError && (
         <div className="tests__health-error">
@@ -290,10 +352,20 @@ function TestsHeader({
   matrix,
   reports,
   loading,
+  runnableCount,
+  runAll,
+  anyRunning,
+  onRunAll,
+  onStopAll,
 }: {
   matrix: TestMatrix;
   reports: ReportMap;
   loading: boolean;
+  runnableCount: number;
+  runAll: RunAllState | null;
+  anyRunning: boolean;
+  onRunAll: () => void;
+  onStopAll: () => void;
 }) {
   const { totals } = matrix;
   const total = totals.passing + totals.failing + totals.stale + totals.missing + totals.unknown;
@@ -307,7 +379,35 @@ function TestsHeader({
     <header className="tests__overview">
       <div className="tests__overview-row">
         <h3 className="panel__h3">Test coverage</h3>
-        {loading && <span className="tests__overview-loading">Loading…</span>}
+        <div className="tests__overview-actions">
+          {loading && <span className="tests__overview-loading">Loading…</span>}
+          {runnableCount >= 1 &&
+            (runAll ? (
+              <div className="tests__runall-progress">
+                <span className="tests__run-spinner" aria-hidden="true" />
+                <span className="tests__runall-progress-text">
+                  Running {runAll.label} — {runAll.current}/{runAll.total}
+                </span>
+                <button type="button" className="pill-btn pill-btn--danger" onClick={onStopAll}>
+                  Stop
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="pill-btn pill-btn--primary"
+                onClick={onRunAll}
+                disabled={anyRunning}
+                title={
+                  runnableCount === 1
+                    ? "Run the configured test suite for this service"
+                    : `Run all ${runnableCount} configured test suites for this service, one after another`
+                }
+              >
+                Run all tests
+              </button>
+            ))}
+        </div>
       </div>
       <div className="tests__overview-grade">
         <span className="tests__overview-num">
@@ -460,9 +560,7 @@ function TestCategorySection({
                     {new Date(r.lastRunAt).toLocaleString()}
                   </p>
                 )}
-                {kindTrend.length > 0 && (
-                  <TestTrendGrid entries={kindTrend} variant="inline" />
-                )}
+                {kindTrend.length > 0 && <TestTrendGrid entries={kindTrend} variant="inline" />}
               </div>
               <div className="tests__kind-actions">
                 {r.script ? (
@@ -498,11 +596,7 @@ function TestCategorySection({
                 (report ? (
                   <TestKindDrilldown report={report} history={kindTrend} />
                 ) : (
-                  <EmptyDrilldown
-                    script={r.script}
-                    kindLabel={kind.label}
-                    history={kindTrend}
-                  />
+                  <EmptyDrilldown script={r.script} kindLabel={kind.label} history={kindTrend} />
                 ))}
             </article>
           );
@@ -1038,7 +1132,7 @@ function groupCases(
   }
   const rank = (s: TestCaseResult["status"]) =>
     s === "failed" ? 0 : s === "skipped" ? 1 : s === "todo" ? 2 : 3;
-  let groups: CaseGroup[] = [];
+  const groups: CaseGroup[] = [];
   for (const [file, list] of byFile) {
     const sorted = [...list].sort((a, b) => rank(a.status) - rank(b.status));
     groups.push({
@@ -1050,7 +1144,7 @@ function groupCases(
   }
   // Groups with failures float to the top; then alphabetical by file.
   groups.sort((a, b) => {
-    if ((a.failed > 0) !== (b.failed > 0)) return a.failed > 0 ? -1 : 1;
+    if (a.failed > 0 !== b.failed > 0) return a.failed > 0 ? -1 : 1;
     return a.file.localeCompare(b.file);
   });
   // Cap total rendered rows. Failures are listed first so they survive the cap.

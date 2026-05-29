@@ -11,7 +11,7 @@
 // evidence, an OS-specific verification recipe, and a Recheck/Attest control.
 
 import { useMemo, useState } from "react";
-
+import { PLATFORM_PARITY_CATALOG } from "../../platform-parity-catalog";
 import type { WorkspaceApiClient } from "../api/client";
 import type {
   PlatformOs,
@@ -20,7 +20,6 @@ import type {
   PlatformParityResult,
   PlatformParityStatus,
 } from "../api/types";
-import { PLATFORM_PARITY_CATALOG } from "../../platform-parity-catalog";
 import { friendlyError } from "../lib/errors";
 import { useWorkspaceCache } from "../lib/workspace-cache";
 import { ProgressStrip } from "./ProgressStrip";
@@ -140,9 +139,7 @@ export function PlatformParityView({ client }: Props) {
     return { ...raw, features: raw.features.map(hydrate) };
   }, [raw]);
 
-  const [categoryFilter, setCategoryFilter] = useState<"all" | PlatformParityCategory>(
-    "all",
-  );
+  const [categoryFilter, setCategoryFilter] = useState<"all" | PlatformParityCategory>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "issues">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [runBusy, setRunBusy] = useState(false);
@@ -191,9 +188,7 @@ export function PlatformParityView({ client }: Props) {
   });
 
   const groups = groupByCategory(visible);
-  const selected = selectedId
-    ? data.features.find((f) => f.id === selectedId) ?? null
-    : null;
+  const selected = selectedId ? (data.features.find((f) => f.id === selectedId) ?? null) : null;
 
   const canRun = Boolean(client?.runPlatformParity) && Boolean(client?.hasLocalCapabilities);
   const canAttest = Boolean(client?.attestPlatformParity) && Boolean(client?.hasLocalCapabilities);
@@ -228,14 +223,11 @@ export function PlatformParityView({ client }: Props) {
         <div className="parity__verdict">
           <ScoreRing score={data.summary.parityScore} />
           <div className="parity__verdict-text">
-            <h2 className="parity__verdict-title">
-              {data.summary.parityScore}% cross-OS parity
-            </h2>
+            <h2 className="parity__verdict-title">{data.summary.parityScore}% cross-OS parity</h2>
             <p className="parity__verdict-meta">
               {data.summary.pass} pass &middot; {data.summary.fail} fail &middot;{" "}
-              {data.summary.partial} partial &middot; {data.summary.unknown} unknown
-              &middot; {data.summary.skipped} skipped &middot;{" "}
-              {data.summary.notApplicable} N/A
+              {data.summary.partial} partial &middot; {data.summary.unknown} unknown &middot;{" "}
+              {data.summary.skipped} skipped &middot; {data.summary.notApplicable} N/A
             </p>
             <p className="parity__verdict-meta">
               {data.summary.blockingGaps === 0 ? (
@@ -251,10 +243,9 @@ export function PlatformParityView({ client }: Props) {
               )}
             </p>
             <p className="parity__verdict-sub">
-              Live evaluation of SigmaShake Desktop features across Linux + macOS +
-              Windows. Auto-checks run on this host; manual attestations record per-OS
-              field verdicts. This host: <code>{data.currentHostLabel}</code> (
-              <code>{data.currentHostId}</code>).
+              Live evaluation of SigmaShake Desktop features across Linux + macOS + Windows.
+              Auto-checks run on this host; manual attestations record per-OS field verdicts. This
+              host: <code>{data.currentHostLabel}</code> (<code>{data.currentHostId}</code>).
             </p>
           </div>
           <div className="parity__controls">
@@ -282,9 +273,7 @@ export function PlatformParityView({ client }: Props) {
           </div>
         </div>
         {runError ? <p className="parity__error">{runError}</p> : null}
-        {data.storeError ? (
-          <p className="parity__warning">Note: {data.storeError}</p>
-        ) : null}
+        {data.storeError ? <p className="parity__warning">Note: {data.storeError}</p> : null}
       </header>
 
       <div className="parity__filters">
@@ -336,9 +325,7 @@ export function PlatformParityView({ client }: Props) {
           <span className="parity__hosts-label">Hosts seen</span>
           {data.hostsSeen.map((h) => (
             <span key={`${h.os}-${h.hostId}`} className="parity__host-chip">
-              <span className={`parity__host-os parity__host-os--${h.os}`}>
-                {osLabel(h.os)}
-              </span>
+              <span className={`parity__host-os parity__host-os--${h.os}`}>{osLabel(h.os)}</span>
               <span className="parity__host-name">{h.hostLabel}</span>
               <span className="parity__host-time">{timeAgo(h.lastCheckedAt)}</span>
             </span>
@@ -446,9 +433,7 @@ function MatrixRow({ feature, selected, onSelect }: MatrixRowProps) {
           <span
             className={`parity__sev parity__sev--${feature.severity}`}
             title={
-              feature.severity === "blocking"
-                ? "Blocking — must work on every OS"
-                : "Recommended"
+              feature.severity === "blocking" ? "Blocking — must work on every OS" : "Recommended"
             }
           >
             {feature.severity === "blocking" ? "Blocking" : "Recommended"}
@@ -525,14 +510,10 @@ function DetailPanel({
       <p className="parity__detail-desc">{feature.description}</p>
       <p className="parity__detail-scope">
         Scope:{" "}
-        {feature.expectedFor === "all"
-          ? "Linux + macOS + Windows"
-          : osLabel(feature.expectedFor)}
+        {feature.expectedFor === "all" ? "Linux + macOS + Windows" : osLabel(feature.expectedFor)}
         {" · "}
         Verification:{" "}
-        {feature.verificationKind === "auto"
-          ? "automated probe on the host"
-          : "manual attestation"}
+        {feature.verificationKind === "auto" ? "automated probe on the host" : "manual attestation"}
       </p>
 
       <div className="parity__detail-grid">
@@ -686,9 +667,7 @@ function CellDetail({ osId, osLabel, feature, canAttest, onAttest }: CellDetailP
                     Status
                     <select
                       value={draftStatus}
-                      onChange={(e) =>
-                        setDraftStatus(e.target.value as PlatformParityStatus)
-                      }
+                      onChange={(e) => setDraftStatus(e.target.value as PlatformParityStatus)}
                       className="parity__attest-select"
                     >
                       <option value="pass">Pass — works on this OS</option>
@@ -742,14 +721,19 @@ function CellDetail({ osId, osLabel, feature, canAttest, onAttest }: CellDetailP
 
 function ScoreRing({ score }: { score: number }) {
   const clamped = Math.max(0, Math.min(100, score));
-  const tone: Tone =
-    clamped >= 80 ? "ok" : clamped >= 50 ? "warn" : clamped >= 25 ? "warn" : "err";
+  const tone: Tone = clamped >= 80 ? "ok" : clamped >= 50 ? "warn" : clamped >= 25 ? "warn" : "err";
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - clamped / 100);
   return (
     <div className={`parity__ring parity__ring--${tone}`}>
-      <svg width="72" height="72" viewBox="0 0 72 72" role="img" aria-label={`Parity score ${clamped} of 100`}>
+      <svg
+        width="72"
+        height="72"
+        viewBox="0 0 72 72"
+        role="img"
+        aria-label={`Parity score ${clamped} of 100`}
+      >
         <circle
           cx="36"
           cy="36"

@@ -1,7 +1,7 @@
 // Monorepo-wide "Fleet" panel. Read-only Phase 3 surface for the
 // sigmashake-fleet control plane:
 //   - Public /api/health probe → reachability pill
-//   - This-machine agent enrollment (local + electrobun runtimes only)
+//   - This-machine agent enrollment (local + plugin runtimes only)
 //   - Authed Fleet overview when the operator has connected their tenant
 //     subdomain: live agent count, policies pending review, recent audit
 //   - Sign-in / connect CTA when not yet configured or session expired
@@ -319,8 +319,8 @@ function EnrollmentCard({ status, client, orgSlug, overview, onEnrolled }: Enrol
           </>
         ) : !client?.hasLocalCapabilities ? (
           <p className="fleet-card__detail">
-            Open Workspace in SigmaShake Desktop to one-click enroll this machine. The cloud
-            surface can't store the agent JWT locally.
+            Open Workspace in SigmaShake Desktop to one-click enroll this machine. The cloud surface
+            can't store the agent JWT locally.
           </p>
         ) : !orgSlug ? (
           <p className="fleet-card__detail">

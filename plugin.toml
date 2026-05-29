@@ -9,7 +9,7 @@
 #   ssg plugins install workspace
 
 id              = "workspace"
-version         = "0.1.1"
+version         = "0.1.2"
 name            = "Workspace"
 description     = "Monorepo manager for SigmaShake — projects, health, run scripts, edit, distribution, platform parity matrix."
 category        = "tools"

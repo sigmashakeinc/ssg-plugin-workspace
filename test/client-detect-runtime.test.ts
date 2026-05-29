@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CapabilityError, detectRuntime } from "../src/client/api/client";
 
 type WindowShape = {
-  __WORKSPACE_CONFIG__?: { runtime: "cloud" | "local" | "electrobun" | "vscode" };
+  __WORKSPACE_CONFIG__?: { runtime: "cloud" | "local" | "vscode" | "plugin" };
 };
 
 const realWindow = (globalThis as { window?: unknown }).window;
@@ -32,11 +32,11 @@ describe("detectRuntime", () => {
     expect(detectRuntime()).toBe("local");
   });
 
-  it("returns the runtime literal from window when set to electrobun", () => {
+  it("returns the runtime literal from window when set to plugin", () => {
     (globalThis as { window: WindowShape }).window = {
-      __WORKSPACE_CONFIG__: { runtime: "electrobun" },
+      __WORKSPACE_CONFIG__: { runtime: "plugin" },
     };
-    expect(detectRuntime()).toBe("electrobun");
+    expect(detectRuntime()).toBe("plugin");
   });
 
   it("returns the runtime literal from window when set to vscode", () => {

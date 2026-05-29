@@ -1,9 +1,10 @@
-// Shared localStorage adapter for WorkspaceSettings. All three runtimes
-// (cloud, local, electrobun) read from here so the user's mode choice is
-// stable across reloads even when the daemon route is unavailable. The
-// local + electrobun clients additionally sync to the SSG daemon's
+// Shared localStorage adapter for WorkspaceSettings. Every runtime
+// (cloud, local, vscode, plugin) reads from here so the user's mode choice
+// is stable across reloads even when the daemon route is unavailable. The
+// local + plugin clients additionally sync to the SSG daemon's
 // `~/.sigmashake/workspace.json` — this module only knows the browser side.
 
+import { normalizeLineOverrides } from "../lib/project-lines";
 import { DEFAULT_WORKSPACE_SETTINGS, type WorkspaceSettings } from "./types";
 
 export const SETTINGS_LS_KEY = "ssg:workspace:settings:v1";
@@ -37,6 +38,7 @@ export function normalizeSettings(raw: unknown): WorkspaceSettings {
     fleetOrgSlug: isValidFleetSlug(r.fleetOrgSlug)
       ? r.fleetOrgSlug
       : DEFAULT_WORKSPACE_SETTINGS.fleetOrgSlug,
+    lineOverrides: normalizeLineOverrides(r.lineOverrides),
     updatedAt:
       typeof r.updatedAt === "number" && Number.isFinite(r.updatedAt)
         ? r.updatedAt

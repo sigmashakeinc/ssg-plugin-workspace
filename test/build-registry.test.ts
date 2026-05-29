@@ -109,8 +109,12 @@ describe("parseStructureBlock", () => {
     expect(slugs).toEqual(sorted);
   });
 
-  it("throws when the structure block is missing", () => {
-    expect(() => parseStructureBlock("no structure here")).toThrow(/no <structure> block/);
+  it("returns an empty array when the structure block is missing", () => {
+    // The monorepo root CLAUDE.md (the "Agent Guide" format) carries Guardrails
+    // and ops sections but no <structure> project list. Missing-block was once
+    // fatal; now build-registry treats it as a warn + empty registry so the
+    // desktop/electrobun bundle's `prebuild` lifecycle hook doesn't hard-crash.
+    expect(parseStructureBlock("no structure here")).toEqual([]);
   });
 
   it("preserves the one-line description on each card", () => {

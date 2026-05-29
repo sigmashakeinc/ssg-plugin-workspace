@@ -65,7 +65,7 @@ function installShim(): void {
 
   if (typeof window === "undefined" || typeof window.acquireVsCodeApi !== "function") {
     // Not running inside a VS Code webview — leave fetch alone. The
-    // electrobun + cloud + local runtimes will pick a different client.
+    // cloud + local + plugin runtimes will pick a different client.
     return;
   }
 

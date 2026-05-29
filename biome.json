@@ -6,6 +6,7 @@
       "**",
       "!dist",
       "!dist-local",
+      "!dist-plugin",
       "!public",
       "!node_modules",
       "!.wrangler",
@@ -33,7 +34,9 @@
         "noStaticElementInteractions": "off",
         "noLabelWithoutControl": "off",
         "noSvgWithoutTitle": "off",
-        "useSemanticElements": "off"
+        "useSemanticElements": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "useHtmlLang": "off"
       },
       "correctness": { "noUnusedVariables": "warn" }
     }

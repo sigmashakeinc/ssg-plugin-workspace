@@ -21,9 +21,7 @@
  * Exit codes: 0 ok, 1 runtime/HTTP error, 2 usage error.
  */
 
-const BASE_URL = (
-  process.env.WORKSPACE_BASE_URL ?? "http://127.0.0.1:7901"
-).replace(/\/+$/, "");
+const BASE_URL = (process.env.WORKSPACE_BASE_URL ?? "http://127.0.0.1:7901").replace(/\/+$/, "");
 
 interface Flags {
   _: string[];
@@ -31,7 +29,7 @@ interface Flags {
 }
 
 function parseArgs(argv: string[]): Flags {
-  const flags: Flags = {_: []};
+  const flags: Flags = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg.startsWith("--")) {
@@ -78,7 +76,7 @@ async function get(path: string): Promise<void> {
   if (tok) headers["X-SigmaShake-Token"] = tok;
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}`, {headers});
+    res = await fetch(`${BASE_URL}${path}`, { headers });
   } catch (err) {
     fail(
       `request failed: ${err instanceof Error ? err.message : String(err)} — is the SSG daemon running on ${BASE_URL}?`,
@@ -91,7 +89,7 @@ async function get(path: string): Promise<void> {
   } catch {
     /* keep raw text */
   }
-  out({ok: res.ok, status: res.status, path, response: parsed});
+  out({ ok: res.ok, status: res.status, path, response: parsed });
   if (!res.ok) process.exit(1);
 }
 
@@ -108,9 +106,7 @@ async function main(): Promise<void> {
       break;
     case "health": {
       const p = typeof flags.projects === "string" ? flags.projects : "";
-      await get(
-        `/api/json/workspace/health${p ? `?projects=${encodeURIComponent(p)}` : ""}`,
-      );
+      await get(`/api/json/workspace/health${p ? `?projects=${encodeURIComponent(p)}` : ""}`);
       break;
     }
     case "context":
@@ -118,9 +114,7 @@ async function main(): Promise<void> {
       break;
     case "ai-native": {
       const slug = typeof flags.slug === "string" ? flags.slug : "";
-      await get(
-        `/api/json/workspace/ai-native${slug ? `?slug=${encodeURIComponent(slug)}` : ""}`,
-      );
+      await get(`/api/json/workspace/ai-native${slug ? `?slug=${encodeURIComponent(slug)}` : ""}`);
       break;
     }
     default:

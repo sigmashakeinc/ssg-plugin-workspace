@@ -1,13 +1,14 @@
-// Vite's `define` substitutes WORKSPACE_RUNTIME at build time. Each of the
-// four Vite configs (cloud / local / electrobun / vscode) emits a different
-// literal so the client can pick its API implementation.
+// Vite's `define` substitutes WORKSPACE_RUNTIME at build time. The three Vite
+// configs (cloud / vscode / plugin) emit a different literal so the client can
+// pick its API implementation; the local runtime is selected at runtime when
+// the plugin shell synthesizes __WORKSPACE_CONFIG__.
 
 declare global {
-  const WORKSPACE_RUNTIME: "cloud" | "local" | "electrobun" | "vscode" | "plugin";
+  const WORKSPACE_RUNTIME: "cloud" | "local" | "vscode" | "plugin";
 
   interface Window {
     __WORKSPACE_CONFIG__?: {
-      runtime: "cloud" | "local" | "electrobun" | "vscode" | "plugin";
+      runtime: "cloud" | "local" | "vscode" | "plugin";
       port?: number;
       token?: string;
       root?: string;

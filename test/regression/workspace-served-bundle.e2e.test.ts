@@ -9,7 +9,7 @@
 // daemon; skips gracefully if the daemon isn't reachable so the regression
 // project still passes on CI / fresh clones.
 
-import { describe, expect, it, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { computePillars, tierFromPillars } from "../../src/client/components/CertificationView";
 import type { CertificationResponse } from "../../src/types";
@@ -66,10 +66,9 @@ beforeAll(async () => {
       fetch(`${DAEMON_BASE}/plugins/workspace/app.css`, {
         signal: AbortSignal.timeout(5_000),
       }),
-      fetch(
-        `${DAEMON_BASE}/api/json/workspace/certify?root=${encodeURIComponent(MONO_ROOT)}`,
-        { signal: AbortSignal.timeout(15_000) },
-      ),
+      fetch(`${DAEMON_BASE}/api/json/workspace/certify?root=${encodeURIComponent(MONO_ROOT)}`, {
+        signal: AbortSignal.timeout(15_000),
+      }),
     ]);
 
     if (!htmlRes.ok) {

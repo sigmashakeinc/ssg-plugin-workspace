@@ -2,7 +2,7 @@
 // Parses ../CLAUDE.md's <structure> block and emits
 // src/registry.generated.ts — a typed PROJECTS_REGISTRY array consumed by the
 // cloud Worker. The cloud has no filesystem so the registry is baked in at
-// build time. The local + electrobun runtimes ignore this file and call the
+// build time. The local + plugin runtimes ignore this file and call the
 // SSG daemon's /api/json/workspace/projects endpoint instead.
 //
 // Run automatically by the `prebuild` / `predeploy` hooks in package.json.
@@ -196,13 +196,10 @@ export function parseStructureBlock(md: string): ProjectCard[] {
     // The monorepo root CLAUDE.md (the "Agent Guide" format) carries Guardrails
     // and ops sections but no <structure> project list. A missing block is not
     // fatal — the cloud registry is a convenience surface, not a build input the
-    // desktop/electrobun bundle depends on. Warn and yield an empty registry so
-    // `prebuild`/`stage:workspace` (and thus the whole desktop build:release
-    // chain) don't hard-crash on it; the committed registry.generated.ts is
+    // plugin or vscode bundles depend on. Warn and yield an empty registry so
+    // the build doesn't hard-crash on it; the committed registry.generated.ts is
     // already empty, so this is behavior-preserving.
-    console.warn(
-      "registry: CLAUDE.md has no <structure> block — emitting empty registry",
-    );
+    console.warn("registry: CLAUDE.md has no <structure> block — emitting empty registry");
     return [];
   }
   const block = m[1]!;
@@ -270,6 +267,27 @@ export function partitionByDirExistence(
   return { present, missing };
 }
 
+/**
+ * Build-time augmentation: ground hasClaudeMd / hasWranglerToml against the
+ * filesystem instead of relying on sub-bullets in the structure block. The
+ * sub-bullet heuristic catches the legacy hand-curated entries, but the
+ * regenerated <structure> block in this monorepo carries only top-level
+ * bullets — leaving these booleans stuck at the parser's initial defaults.
+ * Probing the filesystem is correct at build time (we have it) and irrelevant
+ * at cloud runtime (the result is baked in).
+ */
+export function augmentFromFilesystem(projects: ProjectCard[], monoRoot: string): void {
+  for (const project of projects) {
+    const claudeMd = join(monoRoot, project.slug, "CLAUDE.md");
+    if (existsSync(claudeMd)) project.hasClaudeMd = true;
+    const wrangler = join(monoRoot, project.slug, "wrangler.toml");
+    const wranglerJsonc = join(monoRoot, project.slug, "wrangler.jsonc");
+    if (existsSync(wrangler) || existsSync(wranglerJsonc)) {
+      project.hasWranglerToml = true;
+    }
+  }
+}
+
 function main() {
   const ROOT = resolve(import.meta.dir, "..");
   const MONO_ROOT = resolve(ROOT, "..");
@@ -292,6 +310,9 @@ function main() {
         `CLAUDE.md bullet remains: ${missing.map((p) => p.slug).join(", ")}`,
     );
   }
+
+  // Build-time augmentation — hasClaudeMd / hasWranglerToml from filesystem.
+  augmentFromFilesystem(projects, MONO_ROOT);
 
   // Option C (build-time): scan each project directory for test files and
   // populate testKinds so the cloud baked registry carries filesystem detections.

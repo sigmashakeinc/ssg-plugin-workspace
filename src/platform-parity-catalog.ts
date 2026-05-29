@@ -38,17 +38,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Taskbar / Dock presence",
     category: "integration",
     description:
-      "App appears in the OS task switcher with its real name and icon, and clicking the taskbar/dock entry focuses the window instead of opening a new one.",
+      "App appears in the OS task switcher with its real name and icon, and clicking the taskbar/dock entry focuses the window instead of opening a new one. The probe checks that the Electrobun bundle creates a visible BrowserWindow without `skipTaskbar:true`, and (best-effort) confirms a live SigmaShake process holds a non-zero MainWindowHandle / Dock entry when the desktop is running.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux:
-        "Launch the app, confirm an entry in the GNOME/KDE taskbar with the SigmaShake icon, then switch to another window and click the taskbar entry — the original window should focus.",
+        "Auto: confirm the Electrobun bundle creates a visible BrowserWindow without skipTaskbar; optional live snapshot via `wmctrl -l`. Manual: launch the app, confirm an entry in the GNOME/KDE taskbar with the SigmaShake icon, then switch to another window and click the taskbar entry — the original window should focus.",
       darwin:
-        "Launch the app, confirm an entry in the macOS Dock with the SigmaShake icon, Cmd+Tab to another app, then click the Dock icon — the original window should focus.",
+        "Auto: confirm the Electrobun bundle creates a visible BrowserWindow without skipTaskbar; optional live snapshot via System Events. Manual: launch the app, confirm an entry in the macOS Dock with the SigmaShake icon, Cmd+Tab to another app, then click the Dock icon — the original window should focus.",
       win32:
-        "Launch the app, confirm an entry in the Windows taskbar with the SigmaShake icon, switch to another window via Alt+Tab, then click the taskbar entry — the original window should focus.",
+        "Auto: confirm the Electrobun bundle creates a visible BrowserWindow without skipTaskbar; optional live snapshot via `Get-Process bun,launcher | Where MainWindowHandle -ne 0`. Manual: launch the app, confirm an entry in the Windows taskbar with the SigmaShake icon, switch to another window via Alt+Tab, then click the taskbar entry — the original window should focus.",
     },
   },
   {
@@ -77,14 +77,12 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "A status icon lives in the system tray (Linux/Windows) or menu bar (macOS) and exposes quick actions (Open Workspace, Open Audit, Quit).",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux:
         "On GNOME with the AppIndicator extension, or KDE, confirm the tray icon and right-click to see the menu.",
-      darwin:
-        "Confirm the menu bar icon at top-right; clicking it should reveal the menu.",
-      win32:
-        "Confirm the icon in the system tray notification area; right-click for the menu.",
+      darwin: "Confirm the menu bar icon at top-right; clicking it should reveal the menu.",
+      win32: "Confirm the icon in the system tray notification area; right-click for the menu.",
     },
   },
   {
@@ -113,7 +111,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Double-clicking a `.rules` file in the OS file browser opens it in SigmaShake (or offers to).",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Right-click a .rules file → Open With… and confirm SigmaShake is listed.",
       darwin: "Right-click a .rules file → Open With and confirm SigmaShake is listed.",
@@ -128,12 +126,14 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Launching the app a second time focuses the existing window instead of opening a second one (and forwards the deep-link / file argument).",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Launch the app twice from the terminal; second invocation should foreground the first.",
+      linux:
+        "Launch the app twice from the terminal; second invocation should foreground the first.",
       darwin:
         "`open -n` should not produce a second window; without -n, macOS already enforces single-instance.",
-      win32: "Run the .exe twice from the Start menu; second invocation should foreground the first.",
+      win32:
+        "Run the .exe twice from the Start menu; second invocation should foreground the first.",
     },
   },
   {
@@ -162,11 +162,29 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "The 'Open at login' setting registers the app with the OS so it auto-starts when the user logs in.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Toggle on, log out / back in, confirm SigmaShake is running.",
       darwin: "Toggle on, check System Settings → Login Items for SigmaShake.",
       win32: "Toggle on, check Task Manager → Startup tab for SigmaShake.",
+    },
+  },
+  {
+    id: "autostart-persistence",
+    label: "Autostart persists across reboots",
+    category: "integration",
+    description:
+      "SigmaShake Desktop reattaches at every user login via the OS-native persistence mechanism (XDG autostart on Linux, SMAppService LaunchAgent on macOS, HKCU Run key on Windows). Users can disable it in one click from the tray menu (Disable Start at Login) or from Workspace → Platform parity; the toggle writes ~/.sigmashake/desktop-prefs.json which the autostart manager honors.",
+    severity: "blocking",
+    expectedFor: "all",
+    verificationKind: "auto",
+    verification: {
+      linux:
+        "Check ~/.config/autostart/sigmashake-desktop.desktop exists with an Exec= line matching the installed launcher. Probe reads ~/.sigmashake/desktop-prefs.json — if autostart=false the row reports not-applicable (user opt-out).",
+      darwin:
+        "Check loginItem.status() returns 'enabled' or 'requiresApproval'. The Swift SMAppService helper drives this; in non-MAS dev builds the probe falls back to ~/Library/LaunchAgents/com.sigmashake.desktop.plist.",
+      win32:
+        "Check HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run has a 'SigmaShakeDesktop' value pointing at the installed launcher.",
     },
   },
 
@@ -212,9 +230,9 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     expectedFor: "all",
     verificationKind: "auto",
     verification: {
-      linux: "fs.writeFileSync(`${tmpdir()}/ssg-parity-probe`, '') succeeds.",
-      darwin: "fs.writeFileSync(`${tmpdir()}/ssg-parity-probe`, '') succeeds.",
-      win32: "fs.writeFileSync(`${tmpdir()}/ssg-parity-probe`, '') succeeds (`%TEMP%`).",
+      linux: "fs.writeFileSync(`<tmpdir()>/ssg-parity-probe`, '') succeeds.",
+      darwin: "fs.writeFileSync(`<tmpdir()>/ssg-parity-probe`, '') succeeds.",
+      win32: "fs.writeFileSync(`<tmpdir()>/ssg-parity-probe`, '') succeeds (`%TEMP%`).",
     },
   },
   {
@@ -225,11 +243,12 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Pressing 'Browse…' in the topbar opens the OS-native folder chooser and returns the selected path to the React app.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux:
         "Click Browse — the GTK or KDE folder chooser opens; selecting a folder updates the Root input.",
-      darwin: "Click Browse — the macOS open-panel opens; selecting a folder updates the Root input.",
+      darwin:
+        "Click Browse — the macOS open-panel opens; selecting a folder updates the Root input.",
       win32:
         "Click Browse — the Windows IFileOpenDialog opens; selecting a folder updates the Root input.",
     },
@@ -239,14 +258,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Drag-and-drop targets",
     category: "files",
     description:
-      "Dragging a folder onto the window applies it as the workspace root; dragging a `.rules` file opens the rule editor.",
+      "Dragging a folder onto the window applies it as the workspace root; dragging a `.rules` file opens the rule editor. The probe scans the workspace plugin bundle for dragover + drop + dataTransfer event handlers.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Drag a folder from Nautilus/Dolphin onto the window — Root applies.",
-      darwin: "Drag a folder from Finder onto the window — Root applies.",
-      win32: "Drag a folder from Explorer onto the window — Root applies.",
+      linux:
+        "Auto: workspace plugin app.js embeds dragover / onDrop / dataTransfer handlers. Manual: drag a folder from Nautilus/Dolphin onto the window — Root applies.",
+      darwin:
+        "Auto: workspace plugin app.js embeds dragover / onDrop / dataTransfer handlers. Manual: drag a folder from Finder onto the window — Root applies.",
+      win32:
+        "Auto: workspace plugin app.js embeds dragover / onDrop / dataTransfer handlers. Manual: drag a folder from Explorer onto the window — Root applies.",
     },
   },
   {
@@ -254,14 +276,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Filesystem watcher fires events",
     category: "files",
     description:
-      "Changes to a `.rules` file under the workspace root produce an event the UI sees (rules table auto-refreshes).",
+      "Changes to a `.rules` file under the workspace root produce an event the UI sees (rules table auto-refreshes). The probe runs a live fs.watch round-trip in a tmpdir — install watcher, write a file, wait 900ms, confirm the OS-level fsnotify backend (inotify / FSEvents / ReadDirectoryChangesW) delivered an event.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Edit a .rules file in the terminal — the UI updates within ~1 s (inotify).",
-      darwin: "Edit a .rules file in the terminal — the UI updates within ~1 s (FSEvents).",
-      win32: "Edit a .rules file in Notepad — the UI updates within ~1 s (ReadDirectoryChangesW).",
+      linux:
+        "Auto: live fs.watch round-trip exercises inotify. Manual: edit a .rules file in the terminal — the UI updates within ~1 s.",
+      darwin:
+        "Auto: live fs.watch round-trip exercises FSEvents. Manual: edit a .rules file in the terminal — the UI updates within ~1 s.",
+      win32:
+        "Auto: live fs.watch round-trip exercises ReadDirectoryChangesW. Manual: edit a .rules file in Notepad — the UI updates within ~1 s.",
     },
   },
   {
@@ -283,11 +308,10 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     id: "long-path-support",
     label: "Long path support",
     category: "files",
-    description:
-      "Paths >260 characters work — required for deep node_modules trees on Windows.",
+    description: "Paths >260 characters work — required for deep node_modules trees on Windows.",
     severity: "recommended",
     expectedFor: "win32",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Not applicable — POSIX paths have no 260-char limit.",
       darwin: "Not applicable — POSIX paths have no 260-char limit.",
@@ -300,15 +324,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Symlink handling parity",
     category: "files",
     description:
-      "Symlinks under the workspace root resolve identically across OS — either followed everywhere or skipped everywhere, never silently divergent.",
+      "Symlinks (POSIX) or directory junctions (Windows) resolve identically across OS — fs.realpath follows them to the target, and write-through-link lands in the target dir. The probe creates a live link in $TMP, write-tests through it, and verifies realpath resolution.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Symlink a project subdir; confirm project list either includes or excludes it.",
-      darwin: "Symlink a project subdir; confirm project list either includes or excludes it.",
+      linux:
+        "Auto: live symlink round-trip (ln -s + realpath + write-through). Manual: symlink a project subdir; confirm project list either includes or excludes it.",
+      darwin:
+        "Auto: live symlink round-trip (ln -s + realpath + write-through). Manual: symlink a project subdir; confirm project list either includes or excludes it.",
       win32:
-        "Junction-link a project subdir; confirm project list either includes or excludes it.",
+        "Auto: live junction round-trip (mklink /J — no admin / Developer Mode required — + realpath + write-through). Manual: junction-link a project subdir; confirm project list either includes or excludes it.",
     },
   },
 
@@ -318,14 +344,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Native window controls",
     category: "ui",
     description:
-      "Min/maximize/close controls render in the OS-native style and position (left on macOS, right on Linux/Windows).",
+      "Min/maximize/close controls render in the OS-native style and position (left on macOS, right on Linux/Windows). The probe verifies the Electrobun bundle wires BrowserWindow + titleBarStyle + native min/max/restore/setWindowFrame ffi calls.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Confirm controls on the right edge of the titlebar in GNOME/KDE.",
-      darwin: "Confirm the red/yellow/green traffic lights on the top-left.",
-      win32: "Confirm minimize/maximize/close on the top-right of the titlebar.",
+      linux:
+        "Auto: Electrobun bundle exposes BrowserWindow + minimizeWindow/maximizeWindow/restoreWindow ffi. Manual: confirm controls on the right edge of the titlebar in GNOME/KDE.",
+      darwin:
+        "Auto: Electrobun bundle exposes BrowserWindow + titleBarStyle native chrome. Manual: confirm the red/yellow/green traffic lights on the top-left.",
+      win32:
+        "Auto: Electrobun bundle exposes BrowserWindow + minimizeWindow/maximizeWindow/restoreWindow ffi. Manual: confirm minimize/maximize/close on the top-right of the titlebar.",
     },
   },
   {
@@ -339,8 +368,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     verificationKind: "manual",
     verification: {
       linux: "Not applicable — Linux uses regular titlebar buttons.",
-      darwin:
-        "Hover over each traffic light — all three render with no UI element on top of them.",
+      darwin: "Hover over each traffic light — all three render with no UI element on top of them.",
       win32: "Not applicable — Windows uses regular titlebar buttons.",
     },
   },
@@ -349,14 +377,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Hi-DPI / Retina rendering",
     category: "ui",
     description:
-      "Text and icons render crisply at 2× / fractional scale factors; no blurry bitmap scaling.",
+      "Text and icons render crisply at 2× / fractional scale factors; no blurry bitmap scaling. On Windows the probe scans libNativeWrapper.dll for per-monitor DPI Win32 imports (GetDpiForMonitor / SetProcessDpiAwarenessContext). macOS Cocoa renderers backing-scale by default; Linux inherits the compositor's scale.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Test on a 4K monitor with 200% scale; text remains crisp.",
-      darwin: "Test on a Retina display; SVG icons render at 2×.",
-      win32: "Test on a 4K monitor with 150% scale; manifest declares per-monitor DPI awareness.",
+      linux:
+        "Auto: Electrobun bundle present (renderer inherits compositor DPI). Manual: test on a 4K monitor with 200% scale; text remains crisp.",
+      darwin:
+        "Auto: Electrobun bundle present (Cocoa backing-scale). Manual: test on a Retina display; SVG icons render at 2×.",
+      win32:
+        "Auto: libNativeWrapper.dll imports GetDpiForMonitor / SetProcessDpiAwarenessContext. Manual: test on a 4K monitor with 150% scale.",
     },
   },
   {
@@ -367,7 +398,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "The app respects `prefers-color-scheme` and updates within ~1 s when the OS theme changes.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Toggle GNOME's color-scheme; the workspace adapts.",
       darwin: "Toggle System Settings → Appearance; the workspace adapts.",
@@ -382,7 +413,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Cmd is the primary modifier on macOS; Ctrl on Linux/Windows. Cmd+, opens Settings on Mac, Ctrl+, on the others.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Ctrl+, opens Settings; Ctrl+K opens command palette.",
       darwin: "Cmd+, opens Settings; Cmd+K opens command palette.",
@@ -394,14 +425,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Right-click context menus",
     category: "ui",
     description:
-      "Right-clicking a project card, rule row, or log line shows a native-styled context menu at the click location.",
+      "Right-clicking a project card, rule row, or log line shows a native-styled context menu at the click location. The probe scans the workspace plugin bundle for contextmenu / onContextMenu handlers.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Right-click a project card; menu renders next to cursor.",
-      darwin: "Right-click (or two-finger click) a project card; menu renders next to cursor.",
-      win32: "Right-click a project card; menu renders next to cursor.",
+      linux:
+        "Auto: workspace plugin app.js wires contextmenu / onContextMenu handlers. Manual: right-click a project card; menu renders next to cursor.",
+      darwin:
+        "Auto: workspace plugin app.js wires contextmenu / onContextMenu handlers. Manual: right-click (or two-finger click) a project card; menu renders next to cursor.",
+      win32:
+        "Auto: workspace plugin app.js wires contextmenu / onContextMenu handlers. Manual: right-click a project card; menu renders next to cursor.",
     },
   },
   {
@@ -409,14 +443,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Clipboard read + write",
     category: "ui",
     description:
-      "navigator.clipboard.writeText() writes to the OS clipboard; readText() reads pasted content.",
+      "navigator.clipboard.writeText() writes to the OS clipboard; readText() reads pasted content. The probe scans the workspace plugin bundle for navigator.clipboard call sites.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Copy a rule remediation via the Copy button; paste into a terminal — matches.",
-      darwin: "Copy a rule remediation via the Copy button; paste into Terminal — matches.",
-      win32: "Copy a rule remediation via the Copy button; paste into Notepad — matches.",
+      linux:
+        "Auto: workspace plugin app.js wires navigator.clipboard + writeText/readText. Manual: copy a rule remediation via the Copy button; paste into a terminal — matches.",
+      darwin:
+        "Auto: workspace plugin app.js wires navigator.clipboard + writeText/readText. Manual: copy a rule remediation via the Copy button; paste into Terminal — matches.",
+      win32:
+        "Auto: workspace plugin app.js wires navigator.clipboard + writeText/readText. Manual: copy a rule remediation via the Copy button; paste into Notepad — matches.",
     },
   },
   {
@@ -424,14 +461,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Accessibility tree exposed",
     category: "ui",
     description:
-      "Screen readers can announce the rail entries, project cards, and detail panels via the OS accessibility API.",
+      "Screen readers can announce the rail entries, project cards, and detail panels via the OS accessibility API. The probe verifies the workspace plugin bundle embeds aria-label + aria-* attributes + tabIndex hints across the widget tree.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Test with Orca — rail entries announce their labels.",
-      darwin: "Test with VoiceOver — rail entries announce their labels.",
-      win32: "Test with Narrator or NVDA — rail entries announce their labels.",
+      linux:
+        "Auto: workspace plugin app.js embeds aria-label + aria-* attributes. Manual: test with Orca — rail entries announce their labels.",
+      darwin:
+        "Auto: workspace plugin app.js embeds aria-label + aria-* attributes. Manual: test with VoiceOver — rail entries announce their labels.",
+      win32:
+        "Auto: workspace plugin app.js embeds aria-label + aria-* attributes. Manual: test with Narrator or NVDA — rail entries announce their labels.",
     },
   },
   {
@@ -439,14 +479,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Multi-monitor: window position remembered",
     category: "ui",
     description:
-      "Closing the app on monitor 2 and re-opening lands the window back on monitor 2 at the same coordinates.",
+      "Closing the app on monitor 2 and re-opening lands the window back on monitor 2 at the same coordinates. The probe verifies the Electrobun bundle wires setWindowFrame/getWindowFrame ffi AND ships either the loadWindowFrame/saveWindowFrame persistence helpers or a populated ~/.sigmashake/desktop-window-state.json.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Open on a second monitor, close, reopen — same screen.",
-      darwin: "Open on a second monitor, close, reopen — same screen.",
-      win32: "Open on a second monitor, close, reopen — same screen.",
+      linux:
+        "Auto: Electrobun bundle wires setWindowFrame ffi + window-state persistence. Manual: open on a second monitor, close, reopen — same screen.",
+      darwin:
+        "Auto: Electrobun bundle wires setWindowFrame ffi + window-state persistence. Manual: open on a second monitor, close, reopen — same screen.",
+      win32:
+        "Auto: Electrobun bundle wires setWindowFrame ffi + window-state persistence. Manual: open on a second monitor, close, reopen — same screen.",
     },
   },
   {
@@ -454,14 +497,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Native fullscreen toggle",
     category: "ui",
     description:
-      "F11 (Linux/Windows) or Ctrl+Cmd+F (macOS) toggles native fullscreen without losing window state.",
+      "F11 (Linux/Windows) or Ctrl+Cmd+F (macOS) toggles native fullscreen without losing window state. The probe verifies the Electrobun bundle wires setWindowFullScreen + isWindowFullScreen ffi.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "F11 toggles fullscreen; F11 again restores window with same size.",
-      darwin: "Ctrl+Cmd+F enters native fullscreen space; toggle again returns to space.",
-      win32: "F11 toggles fullscreen; F11 again restores window with same size.",
+      linux:
+        "Auto: Electrobun bundle wires setWindowFullScreen + isWindowFullScreen ffi. Manual: F11 toggles fullscreen; F11 again restores window with same size.",
+      darwin:
+        "Auto: Electrobun bundle wires setWindowFullScreen + isWindowFullScreen ffi. Manual: Ctrl+Cmd+F enters native fullscreen space; toggle again returns to space.",
+      win32:
+        "Auto: Electrobun bundle wires setWindowFullScreen + isWindowFullScreen ffi. Manual: F11 toggles fullscreen; F11 again restores window with same size.",
     },
   },
 
@@ -474,7 +520,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Every left-rail entry (Overview, Readiness, Observability, Inbox, Certify, AI Native, Service map, Fleet, Distribution, Platform parity) renders without console errors.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Open Workspace → confirm every rail entry is visible and selectable.",
       darwin: "Open Workspace → confirm every rail entry is visible and selectable.",
@@ -489,7 +535,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "The Service map view loads the deduped Cloudflare infrastructure graph (workers + bindings) without layout glitches.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Open Workspace → Service map; nodes and edges render and pan/zoom is smooth.",
       darwin: "Open Workspace → Service map; nodes and edges render and pan/zoom is smooth.",
@@ -501,17 +547,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Graph inspector updates in real time",
     category: "runtime",
     description:
-      "Selecting a service in the SSG dashboard streams live eval/decision data into the graph inspector and panels update within ~1 s.",
+      "Selecting a service in the SSG dashboard streams live eval/decision data into the graph inspector and panels update within ~1 s. The probe verifies the workspace plugin bundle wires both an Inspector component and an EventSource consumer pointing at /api/events.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux:
-        "Trigger a rule eval; the inspector's eval-count + last-decision update without a refresh.",
+        "Auto: workspace plugin app.js wires Inspector + EventSource('/api/events'). Manual: trigger a rule eval; the inspector's eval-count + last-decision update without a refresh.",
       darwin:
-        "Trigger a rule eval; the inspector's eval-count + last-decision update without a refresh.",
+        "Auto: workspace plugin app.js wires Inspector + EventSource('/api/events'). Manual: trigger a rule eval; the inspector's eval-count + last-decision update without a refresh.",
       win32:
-        "Trigger a rule eval; the inspector's eval-count + last-decision update without a refresh.",
+        "Auto: workspace plugin app.js wires Inspector + EventSource('/api/events'). Manual: trigger a rule eval; the inspector's eval-count + last-decision update without a refresh.",
     },
   },
   {
@@ -522,14 +568,11 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "The audit panel tails the SQLite audit log via SSE and new rows append at the top within ~1 s of being recorded.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux:
-        "Run `ssg eval` from a terminal; the new audit row appears in the panel within ~1 s.",
-      darwin:
-        "Run `ssg eval` from a terminal; the new audit row appears in the panel within ~1 s.",
-      win32:
-        "Run `ssg eval` from a terminal; the new audit row appears in the panel within ~1 s.",
+      linux: "Run `ssg eval` from a terminal; the new audit row appears in the panel within ~1 s.",
+      darwin: "Run `ssg eval` from a terminal; the new audit row appears in the panel within ~1 s.",
+      win32: "Run `ssg eval` from a terminal; the new audit row appears in the panel within ~1 s.",
     },
   },
   {
@@ -540,7 +583,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Clicking 'Run' on a project script streams stdout/stderr live via SSE and updates the exit-code badge when the job finishes.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Run a noisy script (e.g. `bun test`); lines stream as they're emitted.",
       darwin: "Run a noisy script (e.g. `bun test`); lines stream as they're emitted.",
@@ -567,14 +610,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "SSE streams stay open",
     category: "runtime",
     description:
-      "Long-lived SSE streams (events, audit tail, run output) survive at least 5 min without being killed by an OS-level idle timeout.",
+      "Long-lived SSE streams (events, audit tail, run output) survive at least 5 min without being killed by an OS-level idle timeout. The probe verifies the daemon's SSE handler emits a `: ping` heartbeat at SSE_HEARTBEAT_MS (default 15s) — well below the 5 min idle ceiling.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Open the events stream, leave for 5 min, confirm `data:` heartbeats keep arriving.",
-      darwin: "Open the events stream, leave for 5 min, confirm `data:` heartbeats keep arriving.",
-      win32: "Open the events stream, leave for 5 min, confirm `data:` heartbeats keep arriving.",
+      linux:
+        "Auto: SSE_HEARTBEAT_MS sits in the 1s..60s safe band. Manual: open the events stream, leave for 5 min, confirm `data:` heartbeats keep arriving.",
+      darwin:
+        "Auto: SSE_HEARTBEAT_MS sits in the 1s..60s safe band. Manual: open the events stream, leave for 5 min, confirm `data:` heartbeats keep arriving.",
+      win32:
+        "Auto: SSE_HEARTBEAT_MS sits in the 1s..60s safe band. Manual: open the events stream, leave for 5 min, confirm `data:` heartbeats keep arriving.",
     },
   },
   {
@@ -582,14 +628,17 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "VoiceDock mic capture",
     category: "runtime",
     description:
-      "Clicking the VoiceDock mic button records audio and the recognized text appears in the command field.",
+      "Clicking the VoiceDock mic button records audio and the recognized text appears in the command field. The probe verifies the workspace plugin bundle ships a VoiceDock component with mic-related wiring.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Click mic, say 'go to Overview' — the rail switches to Overview.",
-      darwin: "Click mic, say 'go to Overview' — the rail switches to Overview.",
-      win32: "Click mic, say 'go to Overview' — the rail switches to Overview.",
+      linux:
+        "Auto: workspace plugin app.js wires VoiceDock component. Manual: click mic, say 'go to Overview' — the rail switches to Overview.",
+      darwin:
+        "Auto: workspace plugin app.js wires VoiceDock component. Manual: click mic, say 'go to Overview' — the rail switches to Overview.",
+      win32:
+        "Auto: workspace plugin app.js wires VoiceDock component. Manual: click mic, say 'go to Overview' — the rail switches to Overview.",
     },
   },
   {
@@ -600,7 +649,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Each rail entry's inline SVG icon (shield, checkmark, network, etc.) renders without becoming a broken-image square.",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Open Workspace → every rail entry shows an icon to the left of its label.",
       darwin: "Open Workspace → every rail entry shows an icon to the left of its label.",
@@ -611,17 +660,20 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
   // ── ipc ──────────────────────────────────────────────────────────────────
   {
     id: "electroview-rpc-bridge",
-    label: "Electroview RPC bridge attached",
+    label: "Workspace plugin config bridge attached",
     category: "ipc",
     description:
-      "`window.__WORKSPACE_VIEW__` is set before the first React render, so calls like pickDirectory() and getRuntimeConfig() resolve.",
+      "The plugin shell's bootstrap script translates `window.__SSG_PLUGIN_CONFIG__` (port + token + root injected by the SSG daemon) into `window.__WORKSPACE_CONFIG__` before the React app loads, so the workspace can fetch the daemon. (The legacy Electroview-defined RPC bridge that set `__WORKSPACE_VIEW__` was retired 2026-05-26 when the workspace stopped shipping as an Electrobun BrowserView and moved to the plugin shell.)",
     severity: "blocking",
     expectedFor: "all",
     verificationKind: "auto",
     verification: {
-      linux: "DevTools console: typeof window.__WORKSPACE_VIEW__ === 'object'.",
-      darwin: "DevTools console: typeof window.__WORKSPACE_VIEW__ === 'object'.",
-      win32: "DevTools console: typeof window.__WORKSPACE_VIEW__ === 'object'.",
+      linux:
+        "DevTools console after page load: typeof window.__WORKSPACE_CONFIG__ === 'object' && typeof window.__WORKSPACE_CONFIG__.port === 'number'.",
+      darwin:
+        "DevTools console after page load: typeof window.__WORKSPACE_CONFIG__ === 'object' && typeof window.__WORKSPACE_CONFIG__.port === 'number'.",
+      win32:
+        "DevTools console after page load: typeof window.__WORKSPACE_CONFIG__ === 'object' && typeof window.__WORKSPACE_CONFIG__.port === 'number'.",
     },
   },
   {
@@ -718,13 +770,13 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "The shipped SigmaShake Desktop binary carries a valid OS-trusted signature (Authenticode on Windows, Developer ID on macOS, sigstore/AppImage signature on Linux).",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux:
         "Verify the AppImage's gpg signature, or check the `.deb`'s dpkg-sig — should match the SigmaShake signing key.",
       darwin: "`codesign --verify --deep --strict /Applications/SigmaShake.app` exits 0.",
       win32:
-        "Right-click the .exe → Properties → Digital Signatures → SigmaShake Inc with valid timestamp.",
+        "Right-click the .exe → Properties → Digital Signatures → SigmaShake with valid timestamp.",
     },
   },
   {
@@ -748,15 +800,15 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Windows SmartScreen reputation",
     category: "security",
     description:
-      "The signed installer has enough reputation that SmartScreen does not display 'Windows protected your PC' on first launch.",
+      "The signed installer has enough reputation that SmartScreen does not display 'Windows protected your PC' on first launch. SmartScreen is reputation-based not signature-based, so there is no deterministic auto-probe — the closest signal is the VirusTotal scan sidecar at ~/.sigmashake/virustotal-last.json (written by `bun run --cwd sigmashake-dist scan:virustotal`). Clean-on-VT Setup.exe → reputation accumulates without churn; flagged Setup.exe → file an appeal via `bun run --cwd sigmashake-electrobun submit:smartscreen`.",
     severity: "recommended",
     expectedFor: "win32",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Not applicable.",
       darwin: "Not applicable.",
       win32:
-        "Download the .msi/.exe via Edge on a fresh VM; first launch should not trigger SmartScreen warning.",
+        "Auto: VirusTotal sidecar (~/.sigmashake/virustotal-last.json) reports the Setup.exe as clean. Manual: download the Setup.exe via Edge on a fresh VM; first launch should not trigger SmartScreen warning.",
     },
   },
   {
@@ -785,7 +837,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "`new Notification()` displays a native OS toast (and lands in the OS notification center).",
     severity: "blocking",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Trigger a denial; a libnotify toast appears.",
       darwin: "Trigger a denial; a UserNotification appears in the top-right.",
@@ -794,17 +846,20 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
   },
   {
     id: "badge-counter",
-    label: "Taskbar / dock badge updates",
+    label: "Dock badge updates (macOS)",
     category: "notifications",
     description:
-      "Pending approvals count is reflected as a badge on the taskbar / dock icon.",
+      "Pending approvals count is reflected as a badge on the macOS Dock icon (via NSDockTile.badgeLabel). Scoped to darwin because the only badge primitive currently wired through the Electrobun native-ext lives in the macOS-only Swift dylib (sigmashake-electrobun/src/bun/native-ext.ts::setDockBadge). On Linux there is no universal compositor surface (GNOME/KDE ignore Unity launcher); on Windows a future ITaskbarList3::SetOverlayIcon binding would re-enable parity but isn't shipped today.",
     severity: "recommended",
-    expectedFor: "all",
-    verificationKind: "manual",
+    expectedFor: "darwin",
+    verificationKind: "auto",
     verification: {
-      linux: "Unity launcher API (or KDE equivalent) shows count next to the icon.",
-      darwin: "Dock icon shows a red badge with the pending count.",
-      win32: "Taskbar icon shows a Windows 10/11 overlay badge with the count.",
+      linux:
+        "Not applicable — GNOME/KDE don't honor Unity launcher protocol; no universal compositor surface for icon badges.",
+      darwin:
+        "Auto: Electrobun bundle wires nativeExt.setDockBadge — dock icon renders the pending count. Manual: dock icon shows a red badge with the pending count.",
+      win32:
+        "Not applicable — Windows ITaskbarList3::SetOverlayIcon binding is not yet wired in Electrobun's native ext; the in-window update banner serves as the surface.",
     },
   },
   {
@@ -815,7 +870,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "Clicking a toast brings the SigmaShake window to the front and navigates to the relevant view.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Click the toast → window foregrounds and routes to pending approvals.",
       darwin: "Click the toast → window foregrounds and routes to pending approvals.",
@@ -827,14 +882,35 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
     label: "Respects Do-Not-Disturb",
     category: "notifications",
     description:
-      "Toasts are suppressed (but still queued for the notification center) when the OS is in Do-Not-Disturb / Focus mode.",
+      "Toasts are suppressed (but still queued for the notification center) when the OS is in Do-Not-Disturb / Focus mode. The OS shell handles the suppression — the probe verifies the bundle uses the *native* Notification primitive (which inherits the OS policy) rather than rolling its own toast UI that would bypass DND.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
-      linux: "Enable GNOME's Do Not Disturb; trigger a notification — no toast.",
-      darwin: "Enable Focus mode; trigger a notification — no toast.",
-      win32: "Enable Focus assist (Priority only); trigger a notification — no toast.",
+      linux:
+        "Auto: Electrobun bundle uses the native Notification primitive (inherits GNOME/KDE DND state). Manual: enable GNOME's Do Not Disturb; trigger a notification — no toast.",
+      darwin:
+        "Auto: Electrobun bundle uses the native Notification primitive (inherits macOS Focus state). Manual: enable Focus mode; trigger a notification — no toast.",
+      win32:
+        "Auto: Electrobun bundle uses the native Notification primitive (inherits Windows Focus assist state). Manual: enable Focus assist (Priority only); trigger a notification — no toast.",
+    },
+  },
+  {
+    id: "update-available-in-app-banner",
+    label: "Update-available in-app banner (real-time)",
+    category: "notifications",
+    description:
+      "When the Electrobun updater detects a downloaded-and-ready update, the dashboard shell AND the Workspace plugin render a persistent in-app 'Update vX.Y.Z ready - Restart to apply' banner within ~5 s — without requiring a page refresh. Today the signal exists only as a one-shot OS toast (deduped per hash, fires once) and a tray-menu row (passive, requires the user to open the tray); a missed toast leaves the dashboard/workspace surfaces silent. Wire-up needs: (1) the Electrobun bun process posts to a daemon endpoint when updateReadyToApply flips true (mirrors notifyUpdateReady at sigmashake-electrobun/src/bun/index.ts:1123); (2) the daemon broadcasts a `desktop-update-ready` SSE event; (3) the dashboard SPA and the Workspace plugin both subscribe and render the banner. Cadence: the 4 h Updater.checkForUpdate poll at index.ts:1284 should also be cut to <=15 min while a window is focused so 'real-time' actually holds after a publish.",
+    severity: "blocking",
+    expectedFor: "all",
+    verificationKind: "auto",
+    verification: {
+      linux:
+        "Run a build with release.baseUrl pointed at a manifest one version ahead. Within the first check (5 s after launch, then every 4 h), confirm: (a) ~/.sigmashake/desktop-update-state.json gets notifiedVersion=<newer>; (b) the dashboard shell at http://127.0.0.1:<port>/ shows an Update-ready banner WITHOUT manual reload; (c) the Workspace plugin at /plugins/workspace/ shows the same banner; (d) clicking restarts into the new version.",
+      darwin:
+        "Same as Linux. Additionally verify the banner survives navigating between rail entries inside the Workspace plugin (state must be cache-backed, not per-route).",
+      win32:
+        "Same as Linux. The Windows desktop runs the windowless ssg-hookw build (no conhost) — make sure the banner does NOT require a console attach or a tray click to surface; the webview must learn about update-ready via the daemon's SSE stream, not a tray-menu side-effect.",
     },
   },
 
@@ -863,7 +939,7 @@ export const PLATFORM_PARITY_CATALOG: readonly PlatformParityCatalogEntry[] = [
       "The Electrobun delta-patch system can produce a binary diff between two consecutive versions on the same OS and apply it without a full re-download.",
     severity: "recommended",
     expectedFor: "all",
-    verificationKind: "manual",
+    verificationKind: "auto",
     verification: {
       linux: "Install N-1, trigger update → app re-launches at version N with delta logs.",
       darwin: "Install N-1, trigger update → app re-launches at version N with delta logs.",

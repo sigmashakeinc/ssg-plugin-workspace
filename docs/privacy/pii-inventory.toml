@@ -1,0 +1,34 @@
+# sigmashake-workspace — PII inventory
+#
+# Columns containing PII or sensitive customer data, per GDPR Article 4(1)
+# and CCPA §1798.140(o).
+#
+# Classification:
+#   "direct"   — Directly identifies a person (email, full name).
+#   "indirect" — Identifies a person in combination (IP, hostname, UUID).
+#   "sensitive"— Subject to special handling (SSO subject, credentials).
+
+[meta]
+service = "sigmashake-workspace"
+last_reviewed = "2026-05-27"
+
+[[storage]]
+table = "users_or_sessions"
+column = "subject_or_email"
+classification = "direct"
+purpose = "authentication / session binding"
+retention_ref = "session_retention"
+
+[[storage]]
+table = "audit_log_or_equivalent"
+column = "actor_id"
+classification = "indirect"
+purpose = "who performed the action"
+retention_ref = "audit_retention"
+
+[[storage]]
+table = "audit_log_or_equivalent"
+column = "actor_ip"
+classification = "indirect"
+purpose = "request IP at action time"
+retention_ref = "audit_retention"

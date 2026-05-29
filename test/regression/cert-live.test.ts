@@ -4,7 +4,7 @@
 // service reports. Skips gracefully if the daemon isn't reachable (CI, fresh
 // clone) — this is a local-dev regression guard, not a hard gate.
 
-import { describe, expect, it, beforeAll } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   buildTestsPillar,
@@ -54,7 +54,7 @@ describe("cert-live: JSON shape contract", () => {
     expect(Object.keys(liveResponse!.reports).length).toBeGreaterThan(0);
   });
 
-  it("every report carries the eight dimensions the UI expects", () => {
+  it("every report carries the thirteen dimensions the UI expects", () => {
     if (skipReason) return;
     const expected = new Set([
       "source",
@@ -65,6 +65,14 @@ describe("cert-live: JSON shape contract", () => {
       "security",
       "build",
       "deploy",
+      // Five operational dimensions added 2026-05 to raise the cert ceiling
+      // from "is this safe to ship?" to "is this safe to OPERATE?" — see
+      // workspace-certify.ts DIM_WEIGHTS.
+      "reliability",
+      "operations",
+      "supply_chain",
+      "architecture",
+      "privacy",
     ]);
     for (const report of Object.values(liveResponse!.reports)) {
       const seen = new Set(report.dimensions.map((d) => d.id));
@@ -175,13 +183,11 @@ describe("cert-live: snapshot of known demotions", () => {
   // Soft-asserts the projects we expect to lose gold post-patch. If any of
   // these flip back to gold the team has fixed something — celebrate, then
   // update this list.
-  const KNOWN_NON_OK_CLEAN = [
-    "sigmashake-chat-elixir",
-    "sigmashake-navi-elixir",
-    "sigmashake-electrobun-elixir",
-    "super-saiyan-vfx-elixir",
-    "sigmashake-hub",
-    "sigmashake-obs",
+  const KNOWN_NON_OK_CLEAN: string[] = [
+    // 2026-05-27 — the previously-demoted services (chat-elixir, navi-elixir,
+    // electrobun-elixir, super-saiyan-vfx-elixir, hub, obs) all flipped back
+    // to gold after a workspace-cert scaffolding pass. Keep this snapshot list
+    // narrowable as future demotions appear; deliberately empty today.
   ];
 
   it("known stale/never-run services are below gold", () => {

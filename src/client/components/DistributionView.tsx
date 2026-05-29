@@ -20,12 +20,14 @@ import type {
   DistArtifactRow,
   DistArtifactStatus,
   DistChannelRef,
+  DistCliChannel,
   DistEdge,
   DistInventory,
   DistNode,
   DistNodeState,
   DistProductRollup,
   DistributionData,
+  DistributionDrift,
 } from "../api/types";
 import { friendlyError } from "../lib/errors";
 import { withTimeout } from "../lib/with-timeout";
@@ -60,6 +62,11 @@ export function DistributionView({ client, root }: Props) {
     tone: "ok" | "err";
     text: string;
   } | null>(null);
+  // Live cross-channel lane drift (R2 + GitHub release). Loaded alongside the
+  // orchestrator-state distribution data so the operator sees published-CDN
+  // skew immediately, not just local build state. Independent failure: a
+  // drift fetch failure doesn't blank the inventory.
+  const [drift, setDrift] = useState<DistributionDrift | null>(null);
 
   const load = useCallback(
     async (loadMode: "initial" | "refresh") => {
@@ -83,6 +90,13 @@ export function DistributionView({ client, root }: Props) {
         setLoading(false);
         setRefreshing(false);
       }
+      // Drift probe — fire-and-forget alongside the main load so it never
+      // delays the main render. A failure here just means the banner stays
+      // empty; the inventory + pipeline tabs still work.
+      client
+        .getDistributionDrift()
+        .then(setDrift)
+        .catch(() => {});
     },
     [client, root, cacheSeed],
   );
@@ -207,6 +221,8 @@ export function DistributionView({ client, root }: Props) {
         </div>
       </header>
 
+      {drift && <DriftBanner drift={drift} />}
+
       <div className="dist__modes" role="tablist" aria-label="Distribution view mode">
         <button
           type="button"
@@ -249,8 +265,8 @@ export function DistributionView({ client, root }: Props) {
           <DistInventoryPanel inventory={data.inventory} />
         ) : (
           <p className="dist__hint">
-            The inventory matrix needs a newer SigmaShake than the one running on this
-            machine — restart SigmaShake to pick it up. The Pipeline view still works.
+            The inventory matrix needs a newer SigmaShake than the one running on this machine —
+            restart SigmaShake to pick it up. The Pipeline view still works.
           </p>
         )
       ) : (
@@ -289,9 +305,8 @@ export function DistributionView({ client, root }: Props) {
             </div>
           ) : (
             <p className="dist__hint">
-              Each box is one step in getting a release out the door. Click any box for
-              details. Green means it matches the monorepo; amber means it has drifted
-              out of sync.
+              Each box is one step in getting a release out the door. Click any box for details.
+              Green means it matches the monorepo; amber means it has drifted out of sync.
             </p>
           )}
         </>
@@ -327,6 +342,116 @@ export function DistributionView({ client, root }: Props) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Cross-channel parity banner (R2 + GitHub release skew) ──────────────────
+
+function DriftBanner({ drift }: { drift: DistributionDrift }) {
+  return (
+    <>
+      <DesktopDriftBanner drift={drift} />
+      <CliChannelBanner
+        channels={drift.cliChannels}
+        reference={drift.cliReferenceVersion}
+        driftedCount={drift.cliDriftedCount}
+        note={drift.cliNote}
+      />
+    </>
+  );
+}
+
+// Desktop lane parity (R2 update.json + GitHub release assets).
+function DesktopDriftBanner({ drift }: { drift: DistributionDrift }) {
+  if (drift.driftedCount === 0) {
+    return (
+      <div className="dist__drift dist__drift--ok" data-testid="dist-drift-ok">
+        <span className="dist__drift-pill dist__drift-pill--ok">All desktop lanes in sync</span>
+        <span className="dist__drift-summary">
+          Every lane (linux-x64, win-x64, macos-x64, macos-arm64) is at{" "}
+          <strong>{drift.r2HighestVersion ?? "—"}</strong> on R2 and present on GitHub release{" "}
+          <strong>{drift.ghLatestTag ?? "—"}</strong>.
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="dist__drift dist__drift--warn" data-testid="dist-drift-warn">
+      <div className="dist__drift-head">
+        <span className="dist__drift-pill dist__drift-pill--warn">
+          {drift.driftedCount} desktop lane{drift.driftedCount === 1 ? "" : "s"} need follow-up
+        </span>
+        <span className="dist__drift-summary">
+          Highest R2 version <strong>{drift.r2HighestVersion ?? "—"}</strong>; latest GitHub release{" "}
+          <strong>{drift.ghLatestTag ?? "—"}</strong>. Cross-host catch-up required:
+        </span>
+      </div>
+      <ul className="dist__drift-list">
+        {drift.lanes
+          .filter((l) => l.verdict !== "ok")
+          .map((lane) => (
+            <li key={lane.lane} className={`dist__drift-row dist__drift-row--${lane.verdict}`}>
+              <span className="dist__drift-lane">{lane.lane}</span>
+              <span className={`dist__drift-verdict dist__drift-verdict--${lane.verdict}`}>
+                {lane.verdict.toUpperCase()}
+              </span>
+              <span className="dist__drift-note">{lane.note}</span>
+              {lane.catchUpCommand && (
+                <code className="dist__drift-cmd">{lane.catchUpCommand}</code>
+              )}
+            </li>
+          ))}
+      </ul>
+    </div>
+  );
+}
+
+// SSG CLI publish-channel parity (npm reference vs PyPI / crates.io / GitHub).
+function CliChannelBanner({
+  channels,
+  reference,
+  driftedCount,
+  note,
+}: {
+  channels: DistCliChannel[];
+  reference: string | null;
+  driftedCount: number;
+  note: string;
+}) {
+  if (channels.length === 0) return null;
+  const drifted = driftedCount > 0;
+  return (
+    <div
+      className={`dist__drift dist__cli-drift dist__drift--${drifted ? "warn" : "ok"}`}
+      data-testid={drifted ? "dist-cli-drift-warn" : "dist-cli-drift-ok"}
+    >
+      <div className="dist__drift-head">
+        <span className={`dist__drift-pill dist__drift-pill--${drifted ? "warn" : "ok"}`}>
+          {drifted
+            ? `${driftedCount} CLI channel${driftedCount === 1 ? "" : "s"} behind npm`
+            : "CLI channels in sync"}
+        </span>
+        <span className="dist__drift-summary">
+          Reference <strong>{reference ?? "—"}</strong> (npm). {note}
+        </span>
+      </div>
+      <ul className="dist__drift-list">
+        {channels.map((ch) => (
+          <li key={ch.channel} className={`dist__drift-row dist__drift-row--${ch.verdict}`}>
+            <span className="dist__drift-lane">{ch.label}</span>
+            <span className={`dist__drift-verdict dist__drift-verdict--${ch.verdict}`}>
+              {ch.verdict.toUpperCase()}
+            </span>
+            <span className="dist__drift-note">{ch.note}</span>
+            {ch.url && (
+              <a className="dist__drift-cmd" href={ch.url} target="_blank" rel="noreferrer">
+                {ch.version ?? "—"}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -455,9 +580,7 @@ function MatrixRow({ row }: { row: DistArtifactRow }) {
             </span>
           ))}
         </div>
-        {row.regions.length > 0 && (
-          <div className="dist-inv__reach">{row.regions.join(" · ")}</div>
-        )}
+        {row.regions.length > 0 && <div className="dist-inv__reach">{row.regions.join(" · ")}</div>}
       </td>
       <td>
         <span className="dist-inv__mono">{fmtBytes(row.fileSizeBytes)}</span>
@@ -485,9 +608,7 @@ const STATUS_LABEL: Record<DistArtifactStatus, string> = {
 
 function StatusPill({ status }: { status: DistArtifactStatus }) {
   return (
-    <span className={`dist-inv__status dist-inv__status--${status}`}>
-      {STATUS_LABEL[status]}
-    </span>
+    <span className={`dist-inv__status dist-inv__status--${status}`}>{STATUS_LABEL[status]}</span>
   );
 }
 

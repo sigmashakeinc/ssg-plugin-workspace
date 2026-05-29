@@ -339,9 +339,8 @@ export function WorkspaceCacheProvider({
 
   // Refetch the root-scoped slices (cert / ai-native / readiness) whenever the
   // workspace root changes — the operator picked or typed a new folder in the
-  // topbar. The fetch callbacks resolve the current root at call time
-  // (electrobun via localStorage, local via __WORKSPACE_CONFIG__), so this
-  // effect just re-triggers them. We track the last-seen root in a ref and only
+  // topbar. The fetch callbacks resolve the current root at call time (via
+  // localStorage + __WORKSPACE_CONFIG__), so this effect just re-triggers them. We track the last-seen root in a ref and only
   // refetch on an actual change, so the first render (already covered by the
   // bootstrap prefetch above) doesn't double-fetch. Root-independent slices
   // (fleet/inbox/observability) are intentionally left alone.

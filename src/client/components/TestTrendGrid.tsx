@@ -165,9 +165,7 @@ function cellTitle(e: TestHistoryEntry, latest: boolean): string {
  * share the newest run's fail / not-fail verdict. `pass` and `partial` both
  * count as "not failing" so a green streak isn't broken by a skipped test.
  */
-function currentStreak(
-  entries: TestHistoryEntry[],
-): { failing: boolean; count: number } | null {
+function currentStreak(entries: TestHistoryEntry[]): { failing: boolean; count: number } | null {
   if (entries.length === 0) return null;
   const newestEntry = entries[entries.length - 1];
   if (!newestEntry) return null;

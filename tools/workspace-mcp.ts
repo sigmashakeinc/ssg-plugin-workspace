@@ -21,12 +21,10 @@
  * Env: WORKSPACE_BASE_URL (default http://127.0.0.1:7901), WORKSPACE_TOKEN
  */
 
-const BASE_URL = (
-  process.env.WORKSPACE_BASE_URL ?? "http://127.0.0.1:7901"
-).replace(/\/+$/, "");
+const BASE_URL = (process.env.WORKSPACE_BASE_URL ?? "http://127.0.0.1:7901").replace(/\/+$/, "");
 
 const PROTOCOL_VERSION = "2024-11-05";
-const SERVER_INFO = {name: "sigmashake-workspace", version: "0.1.0"};
+const SERVER_INFO = { name: "sigmashake-workspace", version: "0.1.0" };
 
 interface RpcRequest {
   jsonrpc?: string;
@@ -40,16 +38,15 @@ const TOOLS = [
     name: "list_projects",
     description:
       "List every project the monorepo workspace discovers — slug, type, description, scripts.",
-    inputSchema: {type: "object", properties: {}, additionalProperties: false},
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "workspace_health",
-    description:
-      "Per-project health: git status, deploy gate, and build/test freshness.",
+    description: "Per-project health: git status, deploy gate, and build/test freshness.",
     inputSchema: {
       type: "object",
       properties: {
-        projects: {type: "string", description: "optional comma-separated slug filter"},
+        projects: { type: "string", description: "optional comma-separated slug filter" },
       },
       additionalProperties: false,
     },
@@ -61,7 +58,7 @@ const TOOLS = [
     inputSchema: {
       type: "object",
       properties: {
-        slug: {type: "string", description: "optional single-service slug"},
+        slug: { type: "string", description: "optional single-service slug" },
       },
       additionalProperties: false,
     },
@@ -84,7 +81,7 @@ async function apiGet(path: string): Promise<unknown> {
     } catch {
       /* keep raw text */
     }
-    return {ok: res.ok, status: res.status, path, data};
+    return { ok: res.ok, status: res.status, path, data };
   } catch (err) {
     return {
       ok: false,
@@ -99,15 +96,15 @@ function send(message: Record<string, unknown>): void {
 }
 
 function result(id: RpcRequest["id"], value: unknown): void {
-  send({jsonrpc: "2.0", id, result: value});
+  send({ jsonrpc: "2.0", id, result: value });
 }
 
 function rpcError(id: RpcRequest["id"], code: number, message: string): void {
-  send({jsonrpc: "2.0", id, error: {code, message}});
+  send({ jsonrpc: "2.0", id, error: { code, message } });
 }
 
 function toolText(value: unknown): Record<string, unknown> {
-  return {content: [{type: "text", text: JSON.stringify(value, null, 2)}]};
+  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
 }
 
 async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -116,9 +113,7 @@ async function callTool(name: string, args: Record<string, unknown>): Promise<un
   }
   if (name === "workspace_health") {
     const p = typeof args.projects === "string" ? args.projects : "";
-    return apiGet(
-      `/api/json/workspace/health${p ? `?projects=${encodeURIComponent(p)}` : ""}`,
-    );
+    return apiGet(`/api/json/workspace/health${p ? `?projects=${encodeURIComponent(p)}` : ""}`);
   }
   if (name === "ai_native_report") {
     const slug = typeof args.slug === "string" ? args.slug : "";
@@ -134,14 +129,14 @@ async function handle(req: RpcRequest): Promise<void> {
     case "initialize":
       result(req.id, {
         protocolVersion: PROTOCOL_VERSION,
-        capabilities: {tools: {}},
+        capabilities: { tools: {} },
         serverInfo: SERVER_INFO,
       });
       return;
     case "notifications/initialized":
       return;
     case "tools/list":
-      result(req.id, {tools: TOOLS});
+      result(req.id, { tools: TOOLS });
       return;
     case "tools/call": {
       const name = (req.params?.name as string) ?? "";
@@ -164,11 +159,12 @@ async function main(): Promise<void> {
   const decoder = new TextDecoder();
   let buffer = "";
   for await (const chunk of process.stdin) {
-    buffer += decoder.decode(chunk as Uint8Array, {stream: true});
-    let nl: number;
-    while ((nl = buffer.indexOf("\n")) !== -1) {
+    buffer += decoder.decode(chunk as Uint8Array, { stream: true });
+    let nl = buffer.indexOf("\n");
+    while (nl !== -1) {
       const line = buffer.slice(0, nl).trim();
       buffer = buffer.slice(nl + 1);
+      nl = buffer.indexOf("\n");
       if (!line) continue;
       let req: RpcRequest;
       try {

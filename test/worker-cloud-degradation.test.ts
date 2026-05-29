@@ -89,9 +89,7 @@ describe("CORS preflight", () => {
     expect(res.status).toBe(204);
     // Credentialed (cookie-auth) CORS cannot use `*` — the worker allowlists
     // `*.sigmashake.com` and echoes the request Origin back (see worker.ts).
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
-      "https://docs.sigmashake.com",
-    );
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://docs.sigmashake.com");
     expect(res.headers.get("Access-Control-Allow-Methods")).toContain("GET");
     expect(res.headers.get("Vary")).toBe("Origin");
   });

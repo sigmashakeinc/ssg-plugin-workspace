@@ -691,8 +691,16 @@ export function CertificationView({ client, root }: Props) {
     total: number;
     reports: Record<string, CertReport>;
   } | null>(null);
+  // Live state for the "Refresh checks" button — drives the sentinel sweep
+  // (lint/format/typecheck/audit/build/test + ai-native-latency) so the cert
+  // scanner's 7-day fresh window doesn't expire. tailLine shows the most
+  // recent line streamed back so the operator can see what's happening in a
+  // long sweep without expanding a full log panel.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTail, setRefreshTail] = useState<string>("");
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
-  // Live SSE subscription (local + electrobun runtimes only).
+  // Live SSE subscription (local + plugin runtimes only).
   useEffect(() => {
     if (!client?.hasLocalCapabilities) return;
     const cfg = window.__WORKSPACE_CONFIG__;
@@ -967,7 +975,51 @@ export function CertificationView({ client, root }: Props) {
           >
             Re-scan
           </button>
+          {client?.hasLocalCapabilities ? (
+            <button
+              type="button"
+              className="cert__refresh"
+              onClick={async () => {
+                if (!client) return;
+                setRefreshing(true);
+                setRefreshError(null);
+                setRefreshTail("starting sentinel sweep…");
+                try {
+                  // force=true: the operator's explicit click should re-run
+                  // even kinds whose sentinel was written <24h ago (the
+                  // script's default skip-fresh window).
+                  const handle = await client.refreshSentinels({ force: true });
+                  for await (const ev of handle.events) {
+                    if (ev.line) setRefreshTail(ev.line);
+                    if (ev.done) break;
+                  }
+                  // The cert scanner reads the same sentinels we just
+                  // rewrote — re-fetch the report so the operator sees the
+                  // new freshness immediately.
+                  await cert.refresh();
+                  setRefreshTail("");
+                } catch (err) {
+                  setRefreshError(friendlyError(err));
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+              disabled={refreshing || cert.loading}
+              title="Re-run every service's lint/format/typecheck/audit/test sentinels (slow — minutes)"
+            >
+              {refreshing ? "Refreshing checks…" : "Refresh checks"}
+            </button>
+          ) : null}
         </div>
+        {refreshing || refreshTail || refreshError ? (
+          <p
+            className="cert__hero-meta"
+            style={{ marginTop: 8, opacity: 0.75, fontSize: 12 }}
+            role="status"
+          >
+            {refreshError ? `Refresh failed: ${refreshError}` : refreshTail ? refreshTail : null}
+          </p>
+        ) : null}
       </header>
 
       {/* ── Service list ─────────────────────────────────────────────────── */}
@@ -991,4 +1043,3 @@ export function CertificationView({ client, root }: Props) {
     </div>
   );
 }
-

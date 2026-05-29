@@ -1,0 +1,24 @@
+# sigmashake-workspace — Status-page components owned by this service.
+#
+# status.sigmashake.com aggregates components from every service. This file
+# declares which components sigmashake-workspace owns.
+
+[meta]
+service = "sigmashake-workspace"
+status_page = "https://status.sigmashake.com"
+last_reviewed = "2026-05-27"
+
+[[components]]
+id = "workspace-primary"
+label = "Sigmashake Workspace — Primary Surface"
+description = "Headline endpoint and primary user-visible path"
+health_probe = "https://workspace.sigmashake.com/api/health"
+slo_ref = "availability.service"
+severity_on_down = "P1"
+
+[[components]]
+id = "workspace-correctness"
+label = "Sigmashake Workspace — Correctness"
+description = "Data-loss + correctness invariants — any breach is a security/data incident"
+slo_ref = "correctness.no_data_loss"
+severity_on_down = "P1"

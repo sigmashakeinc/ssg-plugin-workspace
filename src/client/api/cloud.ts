@@ -68,7 +68,7 @@ export function createCloudClient(): WorkspaceApiClient {
       // The infrastructure graph names every internal worker, D1/KV/R2 id,
       // queue, Durable Object, dispatch namespace, and cron in the monorepo
       // — it's a reconnaissance map. The cloud surface has no SSO gate, so
-      // we never expose it from the public Worker; the local + electrobun
+      // we never expose it from the public Worker; the local + plugin
       // runtimes scan wrangler.toml live and return the real graph instead.
       throw new CapabilityError(
         "The service map needs SigmaShake running on your computer so it can read your project configs. Open Workspace in the SigmaShake desktop app.",
@@ -78,6 +78,16 @@ export function createCloudClient(): WorkspaceApiClient {
       throw new CapabilityError(
         "Distribution status needs SigmaShake running on your computer. Open Workspace in the SigmaShake desktop app, or from SigmaShake on the machine that builds your releases.",
       );
+    },
+    async getDistributionDrift() {
+      // Unlike getDistribution() this one is fine to serve from the cloud —
+      // it only polls public R2 + GitHub. The Worker handler is the canonical
+      // source because CORS on the CDN/GH API blocks direct browser fetches.
+      const res = await fetch("/api/workspace/distribution-drift", {
+        credentials: "same-origin",
+      });
+      if (!res.ok) throw new Error(`distribution-drift: ${res.status}`);
+      return res.json();
     },
     async triggerSync() {
       throw new CapabilityError(
@@ -138,7 +148,7 @@ export function createCloudClient(): WorkspaceApiClient {
       // .sigmashake/production-readiness.json (manual + path-exists checks
       // evaluated at build time; cert-signal checks resolve to "unknown"
       // because the cert scanner needs the operator's tree). The local +
-      // electrobun + vscode runtimes still get live cert-signal evaluation
+      // plugin + vscode runtimes still get live cert-signal evaluation
       // from the SSG daemon.
       const res = await fetch("/api/workspace/readiness", { credentials: "same-origin" });
       if (!res.ok) throw new Error(`readiness: ${res.status}`);
@@ -201,6 +211,11 @@ export function createCloudClient(): WorkspaceApiClient {
     async attestPlatformParity(): Promise<PlatformParityResponse> {
       throw new CapabilityError(
         "Recording a platform-parity attestation needs SigmaShake running on your computer — the verdict is written to ~/.sigmashake/platform-parity.json. Open Workspace in the SigmaShake desktop app.",
+      );
+    },
+    async refreshSentinels() {
+      throw new CapabilityError(
+        "Refreshing workspace check sentinels needs SigmaShake running on your computer — the sweep runs `bun audit`, `tsc`, `gts`, etc. against every monorepo service. Open Workspace in the SigmaShake desktop app.",
       );
     },
   };

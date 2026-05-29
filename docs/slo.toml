@@ -1,0 +1,33 @@
+# sigmashake-workspace — Service Level Objectives
+#
+# SLO targets on Service Level Indicators measured over a 28-day rolling
+# window. Burn-rate response in docs/error-budget.md.
+
+[meta]
+service = "sigmashake-workspace"
+window_days = 28
+last_reviewed = "2026-05-27"
+owner = "super@sigmashake.com"
+
+# ── Availability ──────────────────────────────────────────────────────────
+
+[availability.service]
+description = "sigmashake-workspace headline availability — non-5xx responses for the primary endpoint"
+sli = "ratio(sigmashake_workspace_http_requests_total{status!~'5..'}, sigmashake_workspace_http_requests_total)"
+target = 0.999
+budget = 0.001
+
+# ── Latency ───────────────────────────────────────────────────────────────
+
+[latency.p99]
+description = "p99 latency on read endpoints"
+sli = "histogram_quantile(0.99, sigmashake_workspace_http_request_duration_seconds_bucket{method='GET'})"
+target_seconds = 0.5
+
+# ── Correctness ───────────────────────────────────────────────────────────
+
+[correctness.no_data_loss]
+description = "Zero data-loss events — every persisted write reaches durable storage"
+sli = "sigmashake_workspace_data_loss_events_total"
+target_count = 0
+budget_count = 0
