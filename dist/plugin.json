@@ -4,7 +4,7 @@
   "name": "Workspace",
   "description": "Monorepo manager for SigmaShake — projects, health, run scripts, edit, distribution, platform parity matrix.",
   "entry": "index.html",
-  "artifact_url": "__FILL_ME_IN__",
+  "artifact_url": "https://github.com/sigmashakeinc/ssg-plugin-workspace/releases/download/v0.1.2/workspace-0.1.2.tar.gz",
   "artifact_sha256": "0b56fc31332443ae28eb39b736a2861125dcf7ea74e905393c159c9d8109cf73",
   "artifact_signature": "6b46eff980fa0b442d3dc811acd22e11bcf18173aee9441d1dfa946a25cb97ce9e6132cc97a463e9405b2f4c7e84dc6fcb28cae3ebb14f01b3c4b215ad64420c",
   "signing_fingerprint": "302a300506032b6570032100fa27b2eba3b238546c2c6bb48358f6e376cf31c80ab23d4215cacfabfc6dbd55",
