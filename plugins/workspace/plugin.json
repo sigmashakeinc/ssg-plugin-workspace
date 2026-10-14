@@ -1,12 +1,12 @@
 {
   "id": "workspace",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "name": "Workspace",
   "description": "Monorepo manager for SigmaShake — projects, health, run scripts, edit, distribution, platform parity, and QA status.",
   "entry": "index.html",
-  "artifact_url": "https://github.com/sigmashakeinc/ssg-plugin-workspace/releases/download/workspace-v0.1.8/workspace-v0.1.8.tar.gz",
-  "artifact_sha256": "524f7bc791ef8744887472a3372dce000ca9a8039aacd2cd2b7d58cf89f74076",
-  "artifact_signature": "40f28e8ad799552f19c4cc7f8f09e44eeacd5599288d02bf6465db2358573ddeb201aea23ca9115579537284f7152b63418685e76926a07b8eca8570b4cd8202",
+  "artifact_url": "https://github.com/sigmashakeinc/ssg-plugin-workspace/releases/download/workspace-v0.1.9/workspace-v0.1.9.tar.gz",
+  "artifact_sha256": "eaa08fd6c8c48b4d71b5cff64d1fe9c5c6bf20438b2faa62163aa8c355c4db06",
+  "artifact_signature": "9cf8870c004045bb72d5da047aa153e97a47147e4fce3aa7377fc6429f2a654e165bd5d12043a096d70ee39faa9a79f4e9209071d438db937f5b02b70709450f",
   "signing_fingerprint": "302a300506032b657003210078fd845619e68fb2b27f30aed0a75381e948922e9af56273e53d79351a2d5818",
   "min_ssg_version": "0.29.94",
   "nav": [
